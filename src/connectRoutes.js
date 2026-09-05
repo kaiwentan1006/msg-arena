@@ -1,0 +1,416 @@
+'use strict';
+
+/**
+ * MSG Arena — Account linking routes for rich presence
+ *
+ * Two redirect flows live here:
+ *
+ *   Steam   — OpenID 2.0. No app secret; you register a Web API key and Steam
+ *             hands back a SteamID64 that we verify by echoing the response
+ *             back to Steam for confirmation.
+ *   Spotify — OAuth 2.0 authorization code. Needs a client ID + secret from
+ *             the Spotify developer dashboard.
+ *
+ * Both are top-level browser navigations, so neither can carry the normal
+ * Authorization header. The client first asks over the socket for a 5-minute
+ * 'connect'-scoped token (auth.js: generateConnectToken) and puts that in the
+ * URL. Every route below re-verifies that token and refuses anything without
+ * the right scope — a full session token is not accepted, and a connect token
+ * is useless for anything except linking.
+ *
+ * Server admin setup (.env):
+ *   STEAM_API_KEY=...............  https://steamcommunity.com/dev/apikey
+ *   SPOTIFY_CLIENT_ID=..........   https://developer.spotify.com/dashboard
+ *   SPOTIFY_CLIENT_SECRET=......
+ *
+ * The Spotify dashboard needs the redirect URI allow-listed exactly:
+ *   https://<your-haven-host>/connect/spotify/callback
+ */
+
+const express = require('express');
+// NOT destructured at the top. auth.js requires this file near its own end, so
+// when server.js loads auth first (which it does), this module evaluates while
+// auth.js is only part-way through and its module.exports is still empty. A
+// top-level `const { verifyToken } = require('./auth')` captured undefined and
+// kept it forever, which is what made every Steam and Spotify link fail with
+// "verifyToken is not a function" from v3.45.0 onward (#5527). Resolved at call
+// time instead, by which point both modules are fully loaded.
+
+const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state';
+
+function baseUrl(req) {
+  // PUBLIC_URL is the canonical answer when the server can't guess its own
+  // external address — e.g. Docker port mapping (8080→3000), reverse proxy
+  // that strips the port from the Host header, or Cloudflare Tunnels.
+  // Set it in .env and both Steam and Spotify callbacks will use exactly that.
+  // Example: PUBLIC_URL=https://haven.example.com:8443
+  const override = (process.env.PUBLIC_URL || '').trim().replace(/\/+$/, '');
+  if (override) return override;
+
+  // ── Behind a trusted reverse proxy ──────────────────────────────
+  // When Express trust proxy is enabled and the proxy sets
+  // X-Forwarded-Host, that value contains the real hostname (and
+  // optionally the port) the browser used.  Use it verbatim:
+  //   'haven.example.com'       → https://haven.example.com
+  //   'haven.example.com:8443'  → https://haven.example.com:8443
+  // This is more reliable than extracting a port from the raw Host
+  // header, which often carries an internal address (localhost:3000).
+  const isTrusted = req.app ? req.app.get('trust proxy') : false;
+  if (isTrusted) {
+    const fwdHost = req.get('X-Forwarded-Host');
+    if (fwdHost) {
+      // Multiple proxies may each append their value.  The outermost
+      // (first) entry carries the browser's original Host header.
+      return `${req.protocol}://${fwdHost.split(/\s*,\s*/)[0].trim()}`;
+    }
+  }
+
+  // ── Direct exposure or proxy didn't set X-Forwarded-Host ────────
+  // Fall back to req.hostname (trusts X-Forwarded-Host if available,
+  // otherwise reads raw Host header — but always strips port).
+  // Only append a non-standard port from the raw Host header when it
+  // is NOT a common reverse-proxy internal port, so we don't leak
+  // the backend's private port into the public callback URL.
+  const rawHost = req.get('host') || '';
+  const INTERNAL_PORTS = new Set(['3000', '3001', '8080', '8000', '80', '443']);
+  let rawPort = '';
+  if (rawHost.includes(':')) {
+    // Extract the last colon-delimited segment (handles IPv6
+    // addresses like [::1]:3000 without mangling them).
+    const segments = rawHost.split(':');
+    const candidate = segments[segments.length - 1];
+    if (!INTERNAL_PORTS.has(candidate)) rawPort = `:${candidate}`;
+  }
+  return `${req.protocol}://${req.hostname}${rawPort}`;
+}
+
+/** Verify a 'connect'-scoped token and return the user id, or null. */
+function connectUserId(token, provider) {
+  if (!token || typeof token !== 'string') return null;
+  const { verifyToken } = require('./auth');
+  // Opt into the 'connect' scope: verifyToken now rejects scoped tokens for
+  // session use by default, so this must ask for it explicitly. The scope
+  // re-check below is redundant belt-and-suspenders.
+  const decoded = verifyToken(token, { scope: 'connect' });
+  if (!decoded || decoded.scope !== 'connect') return null;
+  if (provider && decoded.provider !== provider) return null;
+  return typeof decoded.id === 'number' ? decoded.id : null;
+}
+
+/**
+ * End the linking flow.
+ *
+ * This deliberately does NOT redirect to /app.html. The OAuth round-trip can
+ * finish anywhere — a popup, a different browser than the one that started it
+ * (Steam's QR sign-in does exactly this), or the desktop app's child window.
+ * Landing on /app.html in any of those places boots a whole second MSG Arena
+ * client, which for a browser that isn't logged in means the user is dumped on
+ * a login screen with no idea why.
+ *
+ * Instead we serve a small self-contained page that reports the result and
+ * closes itself. The real app finds out over its socket — saveConnection
+ * pushes a fresh connections payload to every socket the user has open — so it
+ * updates live no matter where this page ended up.
+ *
+ * Nothing from the provider is interpolated here; `provider` is validated
+ * against a fixed list and `status` is a boolean in disguise.
+ */
+const PROVIDER_LABELS = { steam: 'Steam', spotify: 'Spotify', twitch: 'Twitch' };
+
+function finish(res, status, provider) {
+  const ok = status === 'ok';
+  const label = PROVIDER_LABELS[provider] || 'Account';
+  const title = ok ? `${label} linked` : `Couldn't link ${label}`;
+  const body = ok
+    ? 'You can close this window and go back to MSG Arena.'
+    : 'Something went wrong. Close this window and try again from MSG Arena.';
+
+  res.status(ok ? 200 : 400).type('html').send(`<!doctype html>
+<html><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  body { margin:0; height:100vh; display:flex; align-items:center; justify-content:center;
+         background:#15161a; color:#e6e6e6;
+         font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  .card { text-align:center; padding:32px 40px; background:#1d1f24;
+          border:1px solid #2c2f36; border-radius:12px; max-width:420px; }
+  h1 { font-size:18px; margin:0 0 8px; color:${ok ? '#4ade80' : '#f87171'}; }
+  p { font-size:13px; margin:0; color:#a1a1aa; line-height:1.5; }
+</style></head>
+<body><div class="card"><h1>${ok ? '✓' : '✕'} ${title}</h1><p>${body}</p></div>
+<script>
+  // Only works when this page was opened via window.open (the normal path).
+  // A tab the user landed in some other way just shows the message.
+  setTimeout(function(){ try { window.close(); } catch (e) {} }, ${ok ? 1200 : 4000});
+</script></body></html>`);
+}
+
+async function postForm(url, params, headers = {}) {
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers },
+    body: new URLSearchParams(params),
+  });
+  return resp;
+}
+
+/**
+ * @param {function} getActivity returns the engine from src/activity.js. Passed as a
+ *   getter rather than the object because these routes must be mounted before
+ *   the SPA catch-all in server.js, which is earlier than where the socket
+ *   layer (and with it the activity engine) gets constructed.
+ */
+function createConnectRoutes(getActivity) {
+  const router = express.Router();
+
+  // Every route needs the engine; bail cleanly if it isn't up yet.
+  router.use((req, res, next) => {
+    const engine = getActivity();
+    if (!engine) return res.status(503).send('Server still starting — try again in a moment.');
+    req.activity = engine;
+    next();
+  });
+
+  // ══════════════════════════════════════════════════════
+  // Steam — OpenID 2.0
+  // ══════════════════════════════════════════════════════
+  router.get('/steam', (req, res) => {
+    if (!req.activity.isSteamConfigured()) return res.status(503).send('Steam integration not configured on this server');
+    const userId = connectUserId(req.query.token, 'steam');
+    if (!userId) return res.status(401).send('Link session expired — close this tab and try again from MSG Arena.');
+
+    // The connect token rides along in return_to so the callback can re-verify
+    // who started the flow. It is signed and short-lived, so a tampered or
+    // replayed return_to fails verification rather than linking the wrong user.
+    const returnTo = `${baseUrl(req)}/connect/steam/callback?token=${encodeURIComponent(req.query.token)}`;
+    const params = new URLSearchParams({
+      'openid.ns': 'http://specs.openid.net/auth/2.0',
+      'openid.mode': 'checkid_setup',
+      'openid.return_to': returnTo,
+      'openid.realm': baseUrl(req),
+      'openid.identity': 'http://specs.openid.net/auth/2.0/identifier_select',
+      'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select',
+    });
+    res.redirect(`https://steamcommunity.com/openid/login?${params}`);
+  });
+
+  router.get('/steam/callback', async (req, res) => {
+    if (!req.activity.isSteamConfigured()) {
+      console.error('[MSG Arena activity] Steam callback: integration not configured');
+      return finish(res, 'error', 'steam');
+    }
+    const userId = connectUserId(req.query.token, 'steam');
+    if (!userId) {
+      console.error('[MSG Arena activity] Steam callback: invalid or expired connect token');
+      return finish(res, 'error', 'steam');
+    }
+
+    try {
+      // Echo every openid.* param back to Steam with mode=check_authentication.
+      // This is the whole security model of OpenID 2.0 — without it, anyone
+      // could hand us a hand-written callback URL claiming any SteamID.
+      const check = {};
+      for (const [k, v] of Object.entries(req.query)) {
+        if (k.startsWith('openid.')) check[k] = v;
+      }
+      check['openid.mode'] = 'check_authentication';
+
+      const returnToFromCheck = check['openid.return_to'] || '(missing)';
+
+      const resp = await postForm('https://steamcommunity.com/openid/login', check);
+      const body = await resp.text();
+      if (!/is_valid\s*:\s*true/i.test(body)) {
+        console.error('[MSG Arena activity] Steam check_authentication failed.');
+        console.error('  openid.return_to:', returnToFromCheck);
+        console.error('  openid.realm:', check['openid.realm']);
+        console.error('  openid.op_endpoint:', check['openid.op_endpoint']);
+        console.error('  response:', body.slice(0, 500));
+        return finish(res, 'error', 'steam');
+      }
+
+      const claimed = String(req.query['openid.claimed_id'] || '');
+      const match = claimed.match(/^https?:\/\/steamcommunity\.com\/openid\/id\/(\d{17})$/);
+      if (!match) {
+        console.error('[MSG Arena activity] Steam callback: claimed_id did not match — got:', claimed);
+        return finish(res, 'error', 'steam');
+      }
+      const steamId = match[1];
+
+      // Pull the persona name so the settings UI can show which account is
+      // linked. Non-fatal: a linked-but-unnamed connection still works.
+      let personaName = '';
+      try {
+        const sumResp = await fetch(
+          `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=${encodeURIComponent(process.env.STEAM_API_KEY)}&steamids=${steamId}`
+        );
+        if (sumResp.ok) {
+          const data = await sumResp.json();
+          personaName = data?.response?.players?.[0]?.personaname || '';
+        }
+      } catch { /* name is cosmetic */ }
+
+      req.activity.saveConnection(userId, 'steam', {
+        externalId: steamId,
+        displayName: personaName,
+        accessToken: null,   // Steam needs no per-user token; the API key is server-wide
+        refreshToken: null,
+        expiresAt: 0,
+      });
+
+      // Populate immediately so the user sees their game without waiting up to
+      // a minute for the next poll tick.
+      req.activity.pollSteam().catch(() => {});
+      return finish(res, 'ok', 'steam');
+    } catch (err) {
+      console.error('[MSG Arena activity] Steam link failed:', err.message);
+      return finish(res, 'error', 'steam');
+    }
+  });
+
+  // ══════════════════════════════════════════════════════
+  // Spotify — OAuth 2.0 authorization code
+  // ══════════════════════════════════════════════════════
+  router.get('/spotify', (req, res) => {
+    if (!req.activity.isSpotifyConfigured()) return res.status(503).send('Spotify integration not configured on this server');
+    const userId = connectUserId(req.query.token, 'spotify');
+    if (!userId) return res.status(401).send('Link session expired — close this tab and try again from MSG Arena.');
+
+    const params = new URLSearchParams({
+      client_id: process.env.SPOTIFY_CLIENT_ID,
+      response_type: 'code',
+      redirect_uri: `${baseUrl(req)}/connect/spotify/callback`,
+      scope: SPOTIFY_SCOPES,
+      // The signed connect token doubles as the CSRF state value.
+      state: req.query.token,
+      show_dialog: 'false',
+    });
+    res.redirect(`https://accounts.spotify.com/authorize?${params}`);
+  });
+
+  router.get('/spotify/callback', async (req, res) => {
+    if (!req.activity.isSpotifyConfigured()) return finish(res, 'error', 'spotify');
+    const userId = connectUserId(req.query.state, 'spotify');
+    if (!userId) return finish(res, 'error', 'spotify');
+    if (req.query.error || !req.query.code) return finish(res, 'error', 'spotify');
+
+    try {
+      const basic = Buffer.from(`${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`).toString('base64');
+      const tokenResp = await postForm(
+        'https://accounts.spotify.com/api/token',
+        {
+          grant_type: 'authorization_code',
+          code: String(req.query.code),
+          redirect_uri: `${baseUrl(req)}/connect/spotify/callback`,
+        },
+        { Authorization: `Basic ${basic}` }
+      );
+      if (!tokenResp.ok) {
+        console.error('[MSG Arena activity] Spotify token exchange failed:', tokenResp.status);
+        return finish(res, 'error', 'spotify');
+      }
+      const tok = await tokenResp.json();
+      if (!tok.access_token || !tok.refresh_token) return finish(res, 'error', 'spotify');
+
+      let displayName = '';
+      let externalId = '';
+      try {
+        const meResp = await fetch('https://api.spotify.com/v1/me', {
+          headers: { Authorization: `Bearer ${tok.access_token}` },
+        });
+        if (meResp.ok) {
+          const me = await meResp.json();
+          displayName = me.display_name || me.id || '';
+          externalId = me.id || '';
+        }
+      } catch { /* cosmetic */ }
+
+      req.activity.saveConnection(userId, 'spotify', {
+        externalId,
+        displayName,
+        accessToken: tok.access_token,
+        refreshToken: tok.refresh_token,
+        expiresAt: Date.now() + ((Number(tok.expires_in) || 3600) * 1000),
+      });
+
+      req.activity.pollSpotifyUser(userId).catch(() => {});
+      return finish(res, 'ok', 'spotify');
+    } catch (err) {
+      console.error('[MSG Arena activity] Spotify link failed:', err.message);
+      return finish(res, 'error', 'spotify');
+    }
+  });
+
+  // ── Twitch (OAuth 2.0) — verify identity, then poll "live now" ──
+  // No scopes needed: /helix/users returns the authenticated user's own id +
+  // login with a bare user token. Stream status is read later with an app
+  // token (activity.js), so nothing per-user needs storing beyond the id/login.
+  router.get('/twitch', (req, res) => {
+    if (!req.activity.isTwitchConfigured()) return res.status(503).send('Twitch integration not configured on this server');
+    const userId = connectUserId(req.query.token, 'twitch');
+    if (!userId) return res.status(401).send('Link session expired — close this tab and try again from MSG Arena.');
+    const params = new URLSearchParams({
+      client_id: process.env.TWITCH_CLIENT_ID,
+      redirect_uri: `${baseUrl(req)}/connect/twitch/callback`,
+      response_type: 'code',
+      scope: '',
+      state: req.query.token,   // signed connect token doubles as CSRF state
+    });
+    res.redirect(`https://id.twitch.tv/oauth2/authorize?${params}`);
+  });
+
+  router.get('/twitch/callback', async (req, res) => {
+    if (!req.activity.isTwitchConfigured()) return finish(res, 'error', 'twitch');
+    const userId = connectUserId(req.query.state, 'twitch');
+    if (!userId) return finish(res, 'error', 'twitch');
+    if (req.query.error || !req.query.code) return finish(res, 'error', 'twitch');
+
+    try {
+      const tokenResp = await postForm('https://id.twitch.tv/oauth2/token', {
+        client_id: process.env.TWITCH_CLIENT_ID,
+        client_secret: process.env.TWITCH_CLIENT_SECRET,
+        code: String(req.query.code),
+        grant_type: 'authorization_code',
+        redirect_uri: `${baseUrl(req)}/connect/twitch/callback`,
+      });
+      if (!tokenResp.ok) {
+        console.error('[MSG Arena activity] Twitch token exchange failed:', tokenResp.status);
+        return finish(res, 'error', 'twitch');
+      }
+      const tok = await tokenResp.json();
+      if (!tok.access_token) return finish(res, 'error', 'twitch');
+
+      // Identify the user (id + login) so presence can query streams by id and
+      // the profile can link to twitch.tv/<login>.
+      let externalId = '', login = '';
+      try {
+        const meResp = await fetch('https://api.twitch.tv/helix/users', {
+          headers: { 'Client-Id': process.env.TWITCH_CLIENT_ID, Authorization: `Bearer ${tok.access_token}` },
+        });
+        if (meResp.ok) {
+          const me = await meResp.json();
+          const u = me.data && me.data[0];
+          if (u) { externalId = u.id || ''; login = u.login || u.display_name || ''; }
+        }
+      } catch { /* cosmetic */ }
+      if (!externalId) return finish(res, 'error', 'twitch');
+
+      req.activity.saveConnection(userId, 'twitch', {
+        externalId,
+        displayName: login,
+        accessToken: tok.access_token,
+        refreshToken: tok.refresh_token || null,
+        expiresAt: Date.now() + ((Number(tok.expires_in) || 3600) * 1000),
+        linkMethod: 'oauth',
+      });
+
+      req.activity.pollTwitch().catch(() => {});
+      return finish(res, 'ok', 'twitch');
+    } catch (err) {
+      console.error('[MSG Arena activity] Twitch link failed:', err.message);
+      return finish(res, 'error', 'twitch');
+    }
+  });
+
+  return router;
+}
+
+module.exports = { createConnectRoutes, baseUrl };

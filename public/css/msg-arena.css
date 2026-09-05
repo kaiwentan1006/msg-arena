@@ -1,0 +1,987 @@
+/* ══════════════════════════════════════════════════════════════════════
+   MSG ARENA — design layer
+   ----------------------------------------------------------------------
+   A cohesive modern skin loaded AFTER style.css. It transforms the LOOK
+   (typography, depth, surfaces, accents, motion) without touching the DOM
+   or layout, so every feature keeps working. Rules use theme tokens, so
+   the 26 built-in themes keep their own palettes; this only re-skins the
+   shared component surfaces and the default MSG Arena identity.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Typeface: Inter for UI, Space Grotesk for the wordmark/headings ── */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/inter-400.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/inter-500.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/inter-600.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/inter-700.woff2') format('woff2'); }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/spacegrotesk-500.woff2') format('woff2'); }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/spacegrotesk-600.woff2') format('woff2'); }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/spacegrotesk-700.woff2') format('woff2'); }
+
+/* ── Design variables (applied over every theme) ─────────────────────
+   Only cosmetic scale/typography here; the per-theme colour tokens are
+   left to the theme. --font-* is deliberately NOT overridden for themes
+   whose identity IS a font (crt/win95/matrix), see the guard below. */
+:root {
+  --font-main:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --ma-display:   'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --radius:       12px;
+  --radius-sm:    8px;
+  --ma-radius-lg: 18px;
+  --ma-radius-pill: 999px;
+  --transition:   0.16s cubic-bezier(.4, 0, .2, 1);
+  --ma-shadow-sm: 0 1px 2px rgba(0,0,0,.28);
+  --ma-shadow:    0 6px 20px -6px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.30);
+  --ma-shadow-lg: 0 24px 60px -12px rgba(0,0,0,.60), 0 8px 24px rgba(0,0,0,.35);
+  --ma-ring:      0 0 0 3px var(--accent-glow);
+  --ma-surface:   color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+}
+/* Themes whose whole personality is their typeface keep it. */
+[data-theme="crt"], [data-theme="win95"], [data-theme="matrix"], [data-theme="fallout"] {
+  --font-main: revert;
+  --font-heading: revert;
+}
+
+/* ── Base ────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-main);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.1px;
+}
+h1, h2, h3, h4, .settings-title, .modal h3 { font-family: var(--font-heading); letter-spacing: -0.2px; }
+
+/* App backdrop: a soft depth gradient instead of a flat fill. */
+#app-body, [data-haven-region="workspace"], [data-haven-region="app-shell"] {
+  background:
+    radial-gradient(1200px 600px at 12% -8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+    radial-gradient(1000px 700px at 108% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 55%),
+    var(--bg-primary);
+}
+
+/* ── Custom scrollbars: thin, quiet, accent on hover ─────────────── */
+* { scrollbar-width: thin; scrollbar-color: var(--border-light) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); background-clip: padding-box; }
+
+/* ── Panels: sidebar / member list / channel header ──────────────── */
+.sidebar,
+[data-haven-region="navigation-sidebar"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 96%, var(--accent) 4%), var(--bg-secondary));
+  border-right: 1px solid var(--border);
+}
+.right-sidebar, [data-haven-region="member-list"], [data-haven-region="context-sidebar"] {
+  background: linear-gradient(180deg, var(--bg-secondary), color-mix(in srgb, var(--bg-secondary) 94%, #000 6%));
+  border-left: 1px solid var(--border);
+}
+.channel-header, [data-haven-region="channel-header"] {
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  backdrop-filter: saturate(1.2) blur(8px);
+  -webkit-backdrop-filter: saturate(1.2) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Brand wordmark ──────────────────────────────────────────────── */
+.brand-text, .auth-header h1 {
+  font-family: var(--ma-display);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  background: linear-gradient(92deg, var(--accent-hover), var(--accent));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.logo-sm, .auth-header .logo { filter: drop-shadow(0 0 10px var(--accent-glow)); }
+
+/* ── Channel list items ──────────────────────────────────────────── */
+.channel-item {
+  border-radius: var(--radius-sm);
+  transition: background var(--transition), color var(--transition), transform var(--transition);
+  position: relative;
+}
+.channel-item:hover { background: var(--bg-hover); }
+.channel-item.active, .channel-item.selected {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-active));
+  color: var(--text-primary);
+}
+.channel-item.active::before, .channel-item.selected::before {
+  content: ''; position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 60%; border-radius: 3px; background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn, .btn-sm, button.btn, .settings-btn {
+  border-radius: var(--radius-sm);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
+}
+.btn:active, .btn-sm:active, .btn-accent:active, .btn-send:active { transform: translateY(1px); }
+.btn-accent, .btn-send, .thread-send-btn, .btn-admin-save {
+  background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+  color: var(--accent-text);
+  border: none;
+  box-shadow: 0 2px 10px -2px var(--accent-glow);
+}
+.btn-accent:hover, .btn-send:hover, .thread-send-btn:hover, .btn-admin-save:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px -4px var(--accent-glow);
+  filter: brightness(1.04);
+}
+.btn-danger { transition: transform var(--transition), filter var(--transition); }
+.btn-danger:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+/* ── Inputs + composer ───────────────────────────────────────────── */
+input[type="text"], input[type="password"], input[type="search"], input[type="number"],
+textarea, select, .message-input, .lfg-input, .gameid-input, .connection-username-input {
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+input:focus, textarea:focus, select:focus,
+.message-input:focus, .lfg-input:focus, .gameid-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ma-ring);
+}
+.message-input-container, .composer, [data-haven-region="composer"] {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.message-input-container:focus-within { border-color: var(--accent); box-shadow: var(--ma-ring); }
+
+/* ── Messages ────────────────────────────────────────────────────── */
+.message-row { transition: background var(--transition); border-radius: 6px; }
+.message-row:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.message .username, .message-row .username, .msg-author { font-weight: 600; }
+
+/* ── Modals: glass + elevation ───────────────────────────────────── */
+.modal-overlay { background: rgba(4, 7, 14, 0.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.modal {
+  border-radius: var(--ma-radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--ma-shadow-lg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 96%, var(--accent) 4%), var(--bg-secondary));
+}
+
+/* ── Avatars: subtle ring ────────────────────────────────────────── */
+.user-item .avatar, .message .avatar, .msg-avatar { transition: transform var(--transition); }
+.user-item:hover .avatar { transform: scale(1.06); }
+
+/* ── Member-list rows + group labels ─────────────────────────────── */
+.user-item { border-radius: var(--radius-sm); transition: background var(--transition); }
+.user-item:hover { background: var(--bg-hover); }
+.user-group-label { font-family: var(--font-heading); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+
+/* ── Pills / tags / badges ───────────────────────────────────────── */
+.profile-popup-role, .lfg-mode-tag, .lfg-member, .profile-gameid { border-radius: var(--ma-radius-pill); }
+
+/* ── Server rail bubbles (the multi-server column) ──────────────── */
+.server-bar-item, .server-icon, .server-bubble {
+  transition: border-radius var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+.server-bar-item:hover, .server-icon:hover { transform: translateY(-1px); }
+.server-bar-item.active, .server-icon.active { box-shadow: 0 0 0 2px var(--accent), 0 4px 12px -4px var(--accent-glow); }
+
+/* ── Global accessible focus ring ────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Auth (login) page ───────────────────────────────────────────── */
+.auth-page, body.auth-page {
+  background:
+    radial-gradient(900px 500px at 20% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(800px 600px at 110% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%),
+    var(--bg-primary);
+}
+.auth-card {
+  border-radius: var(--ma-radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--ma-shadow-lg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 92%, var(--accent) 8%), var(--bg-secondary));
+}
+.auth-header .logo { font-size: 2.4rem; }
+.auth-tab.active { color: var(--accent-text); }
+
+/* Respect reduced-motion for all the little lifts/transitions above. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .btn-accent:hover, .btn:hover, .user-item:hover .avatar, .server-bar-item:hover { transform: none !important; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FACE-TO-FACE · webcam / video-call grid
+   The centrepiece of the app — make it feel like a real call. Layers over
+   the functional rules in style.css (sizing, layout modes, focus mode and
+   the size slider stay owned by the base CSS + JS). Theme-aware via tokens.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Stage — glassy, with a glowing cyan lip along the top */
+.webcam-container {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--bg-secondary) 88%, var(--accent) 6%),
+      color-mix(in srgb, var(--bg-primary) 92%, #000 8%));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  box-shadow:
+    inset 0 2px 0 0 color-mix(in srgb, var(--accent) 60%, transparent),
+    inset 0 -18px 40px -30px var(--accent-glow),
+    var(--ma-shadow-sm);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* Header — quiet label with a live dot, tidy controls */
+.webcam-header {
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-secondary);
+  letter-spacing: .01em;
+}
+#webcam-label {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-family: var(--font-heading, inherit);
+  font-weight: 600; color: var(--text-primary);
+}
+#webcam-label::before {
+  content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+  animation: ma-live 2s ease-in-out infinite;
+}
+@keyframes ma-live { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
+.webcam-header .icon-btn.small {
+  border-radius: var(--radius-sm);
+  transition: background var(--transition), color var(--transition);
+}
+.webcam-header .icon-btn.small:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text-primary);
+}
+
+/* Grid — a little more air between faces */
+.webcam-grid { gap: .625rem; padding: .625rem .75rem; }
+
+/* Tile — rounded, real depth, soft placeholder while the camera warms up */
+.webcam-tile {
+  border-radius: var(--ma-radius-lg);
+  background: radial-gradient(130% 120% at 50% -10%,
+              color-mix(in srgb, var(--accent) 10%, #0c0f16), #090a0f);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  box-shadow: var(--ma-shadow);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.webcam-tile:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  box-shadow: var(--ma-shadow-lg), var(--ma-ring);
+}
+.webcam-tile video { border-radius: inherit; background: #05060a; }
+
+/* Active speaker — a living cyan ring driven by real mic level (see app-voice.js) */
+.webcam-tile.speaking {
+  border-color: var(--accent);
+  animation: ma-speaking 1.3s ease-in-out infinite;
+}
+@keyframes ma-speaking {
+  0%,100% { box-shadow: 0 0 0 2px var(--accent), 0 0 16px -4px var(--accent-glow), var(--ma-shadow); }
+  50%     { box-shadow: 0 0 0 2px var(--accent), 0 0 30px  0   var(--accent-glow), var(--ma-shadow); }
+}
+
+/* Name — a floating glass pill, bottom-left (not a full-width bar) */
+.webcam-tile-label {
+  left: .5rem; right: auto; bottom: .5rem; width: auto;
+  max-width: calc(100% - 1rem);
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .22rem .55rem;
+  font-size: .68rem; font-weight: 600; color: #fff; text-align: left;
+  background: color-mix(in srgb, #000 52%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: var(--ma-radius-pill);
+  box-shadow: var(--ma-shadow-sm);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.webcam-tile.speaking .webcam-tile-label {
+  background: color-mix(in srgb, var(--accent) 82%, #000);
+  color: var(--accent-text); border-color: transparent;
+}
+
+/* Controls — circular glass buttons that read as call controls */
+.webcam-tile .stream-popout-btn,
+.webcam-tile .stream-fullscreen-btn,
+.webcam-tile .stream-minimize-btn,
+.webcam-tile .stream-close-btn {
+  width: 1.75rem; height: 1.75rem; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, #000 42%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.16);
+  color: #fff; font-size: .8rem; line-height: 1;
+  box-shadow: var(--ma-shadow-sm);
+  transition: background var(--transition), transform var(--transition), opacity var(--transition);
+}
+.webcam-tile .stream-popout-btn:hover,
+.webcam-tile .stream-fullscreen-btn:hover,
+.webcam-tile .stream-minimize-btn:hover {
+  background: color-mix(in srgb, var(--accent) 78%, #000);
+  color: var(--accent-text); transform: scale(1.08);
+}
+.webcam-tile .stream-close-btn:hover {
+  background: #e5484d; color: #fff; border-color: transparent; transform: scale(1.08);
+}
+.webcam-tile .stream-popout-btn     { top: .4rem; left: .4rem; }
+.webcam-tile .stream-fullscreen-btn { top: .4rem; left: 2.3rem; }
+.webcam-tile .stream-minimize-btn   { top: .4rem; right: 2.3rem; left: auto; }
+.webcam-tile .stream-close-btn      { top: .4rem; right: .4rem; left: auto; }
+
+/* Focus mode — cinematic single-face stage */
+.webcam-container.webcam-focus-mode {
+  background: radial-gradient(90% 120% at 50% 0%, color-mix(in srgb, var(--accent) 7%, #05070c), #04050a);
+}
+.webcam-container.webcam-focus-mode .webcam-tile.webcam-focused {
+  border-radius: var(--radius);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: var(--ma-shadow-lg);
+}
+
+/* Camera toggle in the voice bar — unmistakably "on" while live */
+#voice-cam-btn.sharing, #voice-cam-btn.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* Touch devices have no hover — keep the controls reachable */
+@media (hover: none) {
+  .webcam-tile .stream-popout-btn,
+  .webcam-tile .stream-fullscreen-btn,
+  .webcam-tile .stream-minimize-btn,
+  .webcam-tile .stream-close-btn { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #webcam-label::before, .webcam-tile.speaking { animation: none; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FACE-TO-FACE · Tier 1 — presence tiles, mute badges, gallery layout
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Camera-off presence tile — avatar/initial on the same glass stage as a live
+   tile (Meet/Zoom style: no video, just who is here). */
+.webcam-tile.webcam-presence {
+  aspect-ratio: 16 / 9;
+  width: clamp(9rem, 18vw, 15rem);
+}
+.webcam-presence-body {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.webcam-presence-avatar {
+  width: 34%; max-width: 88px; min-width: 42px; aspect-ratio: 1;
+  border-radius: 50%; object-fit: cover;
+  box-shadow: 0 4px 16px rgba(0,0,0,.45),
+              0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.webcam-presence-initial {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-heading, inherit); font-weight: 700;
+  font-size: clamp(1rem, 4vw, 2rem); color: #fff;
+  background: color-mix(in srgb, var(--accent) 55%, #2a2f3a);
+}
+.webcam-tile.webcam-presence.speaking .webcam-presence-avatar {
+  box-shadow: 0 4px 16px rgba(0,0,0,.45), 0 0 0 3px var(--accent);
+}
+
+/* Mic-muted badge (bottom-right, on any tile) */
+.webcam-mute-badge {
+  position: absolute; right: .45rem; bottom: .5rem; z-index: 4;
+  width: 1.35rem; height: 1.35rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .72rem; line-height: 1;
+  background: color-mix(in srgb, #e5484d 88%, #000); color: #fff;
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: var(--ma-shadow-sm);
+}
+.webcam-mute-badge[hidden] { display: none !important; }
+.webcam-tile.is-muted .webcam-tile-label { max-width: calc(100% - 2.6rem); }
+
+/* ── Gallery / spotlight layout: fill the area with a tidy uniform 16:9 grid ── */
+.webcam-container.webcam-gallery-mode {
+  max-height: none !important;
+  flex: 1 1 auto; min-height: 50vh;
+}
+.webcam-container.webcam-gallery-mode .webcam-grid.layout-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: .75rem; padding: .85rem;
+  max-height: none !important; height: auto; flex: 1;
+  align-content: center; justify-items: center; overflow: auto;
+}
+.webcam-container.webcam-gallery-mode .webcam-grid.layout-gallery .webcam-tile {
+  width: 100% !important; max-width: 42rem !important; height: auto !important;
+  min-width: 0; margin: 0 auto; aspect-ratio: 16 / 9;
+}
+.webcam-container.webcam-gallery-mode .webcam-grid.layout-gallery .webcam-tile video {
+  width: 100% !important; height: 100% !important; max-height: none !important;
+  object-fit: cover;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FACE-TO-FACE · Tier 2 — pin/spotlight, live list speaking cue
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Pin button — matches the other circular glass call-controls, sits next to
+   fullscreen in the top-left cluster. */
+.webcam-tile .stream-pin-btn {
+  position: absolute; top: .4rem; left: 4.2rem;
+  width: 1.75rem; height: 1.75rem; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, #000 42%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.16);
+  color: #fff; font-size: .8rem; line-height: 1; z-index: 3;
+  opacity: 0; cursor: pointer;
+  transition: background var(--transition), transform var(--transition), opacity var(--transition);
+}
+.webcam-tile:hover .stream-pin-btn { opacity: 1; }
+.webcam-tile .stream-pin-btn:hover {
+  background: color-mix(in srgb, var(--accent) 78%, #000);
+  color: var(--accent-text); transform: scale(1.08);
+}
+.webcam-tile .stream-pin-btn.active {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  color: var(--accent-text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+@media (hover: none) { .webcam-tile .stream-pin-btn { opacity: 1; } }
+
+/* Spotlight mode — one big view, the rest as a wrapped row of thumbnails.
+   Uses !important on display so it wins over any layout-* mode (incl. gallery). */
+.webcam-container.webcam-spotlight-mode {
+  max-height: none !important; flex: 1 1 auto; min-height: 50vh;
+}
+.webcam-container.webcam-spotlight-mode .webcam-grid {
+  display: flex !important; flex-wrap: wrap; gap: .55rem;
+  align-content: flex-start; justify-content: center;
+  max-height: none !important; height: auto; overflow: auto; padding: .75rem;
+}
+.webcam-container.webcam-spotlight-mode .webcam-tile {
+  max-width: none !important;
+}
+.webcam-container.webcam-spotlight-mode .webcam-tile.webcam-pinned {
+  flex: 1 1 100%; width: 100% !important; max-width: 60rem !important;
+  aspect-ratio: 16 / 9; margin: 0 auto; order: -1;
+}
+.webcam-container.webcam-spotlight-mode .webcam-tile.webcam-pinned video {
+  width: 100% !important; height: 100% !important; max-height: none !important;
+  object-fit: contain; background: #05060a;
+}
+.webcam-container.webcam-spotlight-mode .webcam-tile:not(.webcam-pinned) {
+  flex: 0 0 auto; width: clamp(7rem, 13vw, 11rem) !important; height: auto !important;
+  aspect-ratio: 16 / 9; min-width: 0;
+}
+
+/* Live active-speaker cue in the voice participant list (Tier 2 item 6) */
+.voice-user-item.talking {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-sm);
+}
+.voice-user-item.talking .user-avatar-wrapper,
+.voice-user-item.talking .user-item-avatar {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 10px -2px var(--accent-glow);
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .voice-user-item.talking .user-avatar-wrapper { transition: box-shadow .12s ease; }
+}
+
+
+/* Connection-quality signal (Tier 2 item 5) — 3 bars, colour by level.
+   Sits bottom-right; shifts left to make room for the mute badge when muted. */
+.webcam-quality {
+  position: absolute; right: .5rem; bottom: .5rem; z-index: 4;
+  display: flex; align-items: flex-end; gap: 2px; height: 1rem; padding: .1rem .3rem;
+  border-radius: .5rem; background: color-mix(in srgb, #000 42%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.webcam-tile.is-muted .webcam-quality { right: 2.25rem; }
+.webcam-quality i { width: 3px; border-radius: 1px; background: rgba(255,255,255,.28); }
+.webcam-quality i:nth-child(1) { height: 4px; }
+.webcam-quality i:nth-child(2) { height: 7px; }
+.webcam-quality i:nth-child(3) { height: 10px; }
+.webcam-quality.q-good i { background: #3ad07a; }
+.webcam-quality.q-ok   i:nth-child(-n+2) { background: #f5a623; }
+.webcam-quality.q-poor i:nth-child(1) { background: #e5484d; }
+
+/* HD (720p) toggle in the webcam header (Tier 2 item 8) */
+.webcam-hd-btn { font-size: .62rem !important; font-weight: 700; letter-spacing: .02em; }
+.webcam-hd-btn.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+  color: var(--accent) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FACE-TO-FACE · Tier 3 — a11y focus, reconnecting overlay, blur toggle
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Keyboard focus ring on webcam controls (item 9); reveal hover-only controls
+   when they receive keyboard focus. */
+.webcam-tile button:focus-visible,
+.webcam-header button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  opacity: 1 !important;
+}
+
+/* Reconnecting overlay on a stalled tile (item 10) */
+.webcam-reconnecting {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;
+  background: color-mix(in srgb, #05060a 62%, transparent);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  color: #fff; font-size: .72rem; font-weight: 600; letter-spacing: .01em;
+}
+.webcam-reconnecting-spin {
+  width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.25); border-top-color: var(--accent);
+  animation: ma-spin .8s linear infinite;
+}
+@keyframes ma-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .webcam-reconnecting-spin { animation: none; } }
+
+/* Background-blur toggle active state (item 11) */
+.webcam-blur-btn.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+  color: var(--accent) !important;
+}
+
+
+/* XP / level bar in the player card (gamer stats) */
+.gs-level { display: flex; align-items: center; gap: .5rem; margin: .35rem 0 .55rem; flex-wrap: wrap; }
+.gs-level-badge { font-weight: 700; font-size: .78rem; color: var(--accent); white-space: nowrap; }
+.gs-level-bar {
+  flex: 1 1 6rem; min-width: 5rem; height: .5rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent); overflow: hidden;
+}
+.gs-level-fill {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-hover), var(--accent));
+  box-shadow: 0 0 8px -1px var(--accent-glow); transition: width .4s ease;
+}
+.gs-level-xp { font-size: .66rem; color: var(--text-muted); white-space: nowrap; }
+
+
+/* ══ My Games / Find Players hub ══ */
+.games-body { padding: 1rem 1.1rem; max-height: 70vh; overflow-y: auto; }
+.games-hint { color: var(--text-muted); font-size: .78rem; margin-bottom: .6rem; }
+.games-grid { display: flex; flex-direction: column; gap: .35rem; }
+.game-row {
+  display: flex; align-items: center; gap: .6rem; padding: .5rem .65rem;
+  border-radius: var(--radius-sm); background: var(--ma-surface);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.game-row:hover { background: var(--bg-hover); }
+.game-row.mine {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--ma-surface));
+}
+.game-row-icon { font-size: 1.1rem; }
+.game-row-name { flex: 1; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.game-row-count { font-size: .72rem; color: var(--text-muted); white-space: nowrap; }
+.game-star {
+  background: none; border: none; font-size: 1.15rem; cursor: pointer;
+  color: var(--text-muted); line-height: 1; padding: 0 .2rem;
+  transition: transform var(--transition), color var(--transition);
+}
+.game-star:hover { transform: scale(1.15); }
+.game-star.on { color: var(--accent); text-shadow: 0 0 8px var(--accent-glow); }
+.games-back { background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 600; font-size: .8rem; padding: 0 0 .5rem; }
+.games-players-head { font-family: var(--font-heading, inherit); font-weight: 700; margin-bottom: .6rem; color: var(--text-primary); }
+.games-players { display: flex; flex-direction: column; gap: .25rem; }
+.gp-row { display: flex; align-items: center; gap: .55rem; padding: .4rem .5rem; border-radius: var(--radius-sm); cursor: pointer; }
+.gp-row:hover { background: var(--bg-hover); }
+.gp-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.gp-dot.on { background: #3ad07a; box-shadow: 0 0 6px rgba(58,208,122,.5); }
+.gp-avatar { width: 1.6rem; height: 1.6rem; border-radius: 50%; object-fit: cover; }
+.gp-initial { display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .72rem; }
+.gp-name { font-weight: 500; color: var(--text-primary); }
+
+/* "Plays:" chips on the player card */
+.gs-games { display: flex; flex-wrap: wrap; gap: .3rem; margin: .1rem 0 .4rem; }
+.gs-game-chip {
+  font-size: .68rem; padding: .12rem .45rem; border-radius: var(--ma-radius-pill);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-secondary); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  white-space: nowrap;
+}
+
+
+/* ══ Squads / teams hub ══ */
+.squads-body { padding: 1rem 1.1rem; max-height: 72vh; overflow-y: auto; }
+.squad-tabs { display: flex; gap: .4rem; margin-bottom: .8rem; border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent); }
+.squad-tab { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-weight: 600; font-size: .82rem; padding: .4rem .7rem; border-bottom: 2px solid transparent; }
+.squad-tab:hover { color: var(--text-primary); }
+.squad-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.squad-section-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: .7rem 0 .4rem; font-weight: 700; }
+.squad-list { display: flex; flex-direction: column; gap: .35rem; }
+.squad-row, .squad-invite-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .7rem; border-radius: var(--radius-sm); background: var(--ma-surface); cursor: pointer; }
+.squad-row:hover { background: var(--bg-hover); }
+.squad-invite-row { cursor: default; }
+.squad-name { flex: 1; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.squad-tag { color: var(--accent); font-weight: 700; }
+.squad-members { font-size: .74rem; color: var(--text-muted); white-space: nowrap; }
+.squad-role { font-size: .62rem; text-transform: uppercase; letter-spacing: .03em; padding: .1rem .4rem; border-radius: var(--ma-radius-pill); font-weight: 700; }
+.squad-role-owner { background: color-mix(in srgb, #f5a623 30%, transparent); color: #f5a623; }
+.squad-role-captain { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--accent); }
+.squad-role-member { background: color-mix(in srgb, var(--text-primary) 12%, transparent); color: var(--text-secondary); }
+.squad-invite-by { font-size: .72rem; color: var(--text-muted); }
+.squad-invite-actions { display: flex; gap: .35rem; }
+.squad-create { display: flex; flex-direction: column; gap: .55rem; max-width: 26rem; }
+.squad-create textarea.lfg-input { resize: vertical; }
+.squad-detail-head { font-family: var(--font-heading, inherit); font-weight: 700; font-size: 1.05rem; color: var(--text-primary); display: flex; align-items: center; gap: .5rem; margin: .4rem 0; }
+.squad-desc { color: var(--text-secondary); font-size: .82rem; margin-bottom: .7rem; }
+.squad-roster { display: flex; flex-direction: column; gap: .25rem; }
+.squad-member-row { display: flex; align-items: center; gap: .55rem; padding: .35rem .45rem; border-radius: var(--radius-sm); }
+.squad-member-row:hover { background: var(--bg-hover); }
+.squad-member-actions { margin-left: auto; display: flex; gap: .3rem; }
+.squad-invite-box { margin: .5rem 0 .8rem; }
+.squad-candidates { display: flex; flex-direction: column; gap: 2px; margin-top: .3rem; max-height: 12rem; overflow-y: auto; }
+.squad-candidate { padding: .35rem .5rem; border-radius: var(--radius-sm); background: var(--ma-surface); cursor: pointer; font-size: .82rem; }
+.squad-candidate:hover { background: color-mix(in srgb, var(--accent) 16%, var(--bg-hover)); }
+.squad-cand-empty { color: var(--text-muted); font-size: .74rem; padding: .3rem .5rem; }
+.squad-detail-footer { display: flex; gap: .5rem; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent); }
+.btn-danger { background: color-mix(in srgb, #e5484d 88%, #000); color: #fff; }
+.btn-danger:hover { background: #e5484d; }
+/* invite badge on the sidebar squads button */
+.squads-badge { position: absolute; top: 2px; right: 2px; min-width: 1rem; height: 1rem; padding: 0 .2rem; border-radius: 999px; background: #e5484d; color: #fff; font-size: .58rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+#squads-btn { position: relative; }
+/* squad chips on the player card */
+.gs-squad-chip { font-size: .68rem; padding: .12rem .45rem; border-radius: var(--ma-radius-pill); background: color-mix(in srgb, #f5a623 14%, transparent); color: var(--text-secondary); border: 1px solid color-mix(in srgb, #f5a623 26%, transparent); white-space: nowrap; }
+
+
+/* Self-assignable roles picker (profile self-view) */
+.profile-selfroles { margin: .4rem 0 .2rem; }
+.selfrole-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+.selfrole-chip {
+  font-size: .7rem; padding: .18rem .55rem; border-radius: var(--ma-radius-pill); cursor: pointer;
+  background: color-mix(in srgb, var(--rc, var(--accent)) 12%, transparent);
+  color: var(--text-secondary); border: 1px solid color-mix(in srgb, var(--rc, var(--accent)) 30%, transparent);
+  transition: background var(--transition), color var(--transition);
+}
+.selfrole-chip:hover { background: color-mix(in srgb, var(--rc, var(--accent)) 22%, transparent); color: var(--text-primary); }
+.selfrole-chip.on { background: color-mix(in srgb, var(--rc, var(--accent)) 30%, transparent); color: var(--text-primary); border-color: var(--rc, var(--accent)); font-weight: 600; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   MSG ARENA — SHELL OVERHAUL v2   (premium gaming redesign)
+   Appended last so it wins on source order over style.css + the earlier
+   msg-arena layer. Pure restyle: the DOM is untouched, every id/class the
+   JS binds to is preserved, so no function changes. Signature language:
+   a cyan→violet duotone, atmospheric depth, glass panels, restrained neon
+   glow, and tasteful motion (all reduced-motion safe at the bottom).
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ma-accent-2:   #a855f7;                                   /* violet — pairs with the cyan accent */
+  --ma-accent-3:   #f43f5e;                                   /* hot magenta for rare highlights     */
+  --ma-grad:       linear-gradient(135deg, var(--accent), var(--ma-accent-2));
+  --ma-grad-rev:   linear-gradient(135deg, var(--ma-accent-2), var(--accent));
+  --ma-grad-soft:  linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--ma-accent-2) 18%, transparent));
+  --ma-glow:       0 0 22px -4px var(--accent-glow);
+  --ma-glow-violet:0 0 22px -4px color-mix(in srgb, var(--ma-accent-2) 60%, transparent);
+  --ma-glass:      color-mix(in srgb, var(--bg-secondary) 62%, transparent);
+  --ma-glass-2:    color-mix(in srgb, var(--bg-tertiary) 66%, transparent);
+  --ma-hairline:   color-mix(in srgb, var(--accent) 16%, var(--border));
+}
+
+/* ── Atmosphere: layered aurora + a faint dot-grid over the workspace ── */
+#app-body, [data-haven-region="workspace"], [data-haven-region="app-shell"] {
+  background:
+    radial-gradient(900px 520px at 6% -12%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 60%),
+    radial-gradient(820px 640px at 106% 2%, color-mix(in srgb, var(--ma-accent-2) 13%, transparent), transparent 58%),
+    radial-gradient(760px 760px at 58% 128%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 56%),
+    var(--bg-primary);
+}
+#app-body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image: radial-gradient(color-mix(in srgb, var(--text-primary) 6%, transparent) 1px, transparent 1px);
+  background-size: 26px 26px; opacity:.45;
+  -webkit-mask-image: radial-gradient(130% 120% at 50% -10%, #000 45%, transparent 92%);
+          mask-image: radial-gradient(130% 120% at 50% -10%, #000 45%, transparent 92%);
+}
+/* keep the real UI above the texture */
+.server-bar, .sidebar, .main, .right-sidebar,
+.right-sidebar-voice, .right-sidebar-users { position: relative; z-index: 1; }
+
+/* ══ Server rail — glassy column, gradient home, glowing active marker ══ */
+.server-bar, [data-haven-region="server-rail"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 88%, #000 12%), var(--bg-tertiary));
+  border-right: 1px solid var(--ma-hairline);
+  gap: 10px;
+}
+.server-icon {
+  position: relative; border-radius: 16px;
+  transition: border-radius var(--transition), transform var(--transition), box-shadow var(--transition), background var(--transition), color var(--transition);
+}
+.server-icon:hover { border-radius: 13px; transform: translateY(-1px); }
+.server-icon.home {
+  background: var(--ma-grad); color: #fff; border: none; box-shadow: var(--ma-glow);
+}
+.server-icon.home .server-icon-text { filter: drop-shadow(0 1px 4px rgba(0,0,0,.45)); }
+.server-icon.active::before {
+  content:''; position:absolute; left:-9px; top:50%; transform:translateY(-50%);
+  width:4px; height:66%; border-radius:0 4px 4px 0; background: var(--ma-grad); box-shadow: var(--ma-glow);
+}
+.server-icon.add-server:hover  { color: var(--accent); border-color: var(--accent); box-shadow: var(--ma-glow); }
+.server-status-dot.online { box-shadow: 0 0 8px 1px color-mix(in srgb, var(--success, #22c55e) 80%, transparent); }
+
+/* ══ Sidebar shell ══════════════════════════════════════════════════ */
+.sidebar, [data-haven-region="navigation-sidebar"] {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 94%, var(--accent) 6%), var(--bg-secondary) 40%, color-mix(in srgb, var(--bg-secondary) 96%, #000 4%));
+  border-right: 1px solid var(--ma-hairline);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, #fff 3%, transparent);
+}
+.sidebar-header { border-bottom: 1px solid var(--ma-hairline); }
+
+/* Brand lockup */
+.brand { gap: 9px; }
+.brand .logo-sm { font-size: 1.15rem; filter: drop-shadow(0 0 12px var(--accent-glow)); }
+.brand-text {
+  font-family: var(--ma-display); font-weight: 700; letter-spacing: 1.6px; font-size: 1.02rem;
+  background: var(--ma-grad); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+
+/* User "player-card" chip */
+.user-bar {
+  background: var(--ma-grad-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent), var(--ma-shadow-sm);
+}
+.user-bar .current-user { font-weight: 650; letter-spacing:.2px; }
+.user-bar .led.on { box-shadow: 0 0 9px 1px color-mix(in srgb, var(--success,#22c55e) 85%, transparent); }
+.user-bar .icon-btn:hover { color: var(--accent); }
+
+/* Section labels — quiet, tracked, with a tiny gradient tick */
+.section-label, .panel-title, .sidebar-section > h5 {
+  text-transform: uppercase; letter-spacing: 1.1px; font-size: .68rem; font-weight: 700;
+  color: var(--text-muted);
+}
+.section-label .section-label-text::before {
+  content:''; display:inline-block; width:10px; height:2px; margin-right:7px; vertical-align:middle;
+  border-radius:2px; background: var(--ma-grad);
+}
+
+/* Join-a-channel: sleek field + gradient CTA */
+[data-mod-id="join"] input[type="text"], #join-code-input {
+  border-radius: var(--ma-radius-pill); background: var(--ma-glass-2);
+  border: 1px solid var(--border);
+}
+[data-mod-id="join"] .btn-accent, [data-mod-id="join"] button {
+  border-radius: var(--ma-radius-pill);
+}
+
+/* Channel rows — stronger active state with duotone edge + glow */
+.channel-item.active, .channel-item.selected {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--ma-accent-2) 10%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.channel-item.active::before, .channel-item.selected::before {
+  background: var(--ma-grad); box-shadow: var(--ma-glow); height: 62%;
+}
+
+/* ══ THE BOTTOM BAR (the reported breakage) ══════════════════════════
+   Base laid 14 buttons in a single no-wrap flex row → they overflowed the
+   sidebar and clipped. Reflow into a tidy auto-fitting tile grid: every
+   launcher fits, wraps to as many rows as needed, and now reads as an
+   intentional dock instead of a cut-off strip. ── */
+.sidebar-bottom { border-top: 1px solid var(--ma-hairline); background: color-mix(in srgb, var(--bg-secondary) 70%, #000 6%); }
+.sidebar-bottom-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 7px;
+  padding: 10px 12px 12px;
+  align-items: stretch;
+}
+.sidebar-bottom-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 38px; padding: 0; font-size: 1.04rem; line-height: 1;
+  background: var(--ma-glass-2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text-secondary);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition), color var(--transition);
+}
+.sidebar-bottom-btn:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg-tertiary));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  color: var(--text-primary);
+  box-shadow: var(--ma-glow);
+}
+.sidebar-bottom-btn:active { transform: translateY(0); }
+.sidebar-bottom-btn.donate-btn:hover {
+  background: color-mix(in srgb, var(--ma-accent-3) 18%, var(--bg-tertiary));
+  border-color: color-mix(in srgb, var(--ma-accent-3) 55%, var(--border));
+  box-shadow: 0 0 22px -4px color-mix(in srgb, var(--ma-accent-3) 55%, transparent);
+}
+/* squad-invite badge sits on the tile corner cleanly */
+.sidebar-bottom-btn { position: relative; overflow: visible; }
+
+/* ══ Main column ════════════════════════════════════════════════════ */
+.channel-header, [data-haven-region="channel-header"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 78%, transparent), color-mix(in srgb, var(--bg-secondary) 55%, transparent));
+  backdrop-filter: saturate(1.3) blur(10px); -webkit-backdrop-filter: saturate(1.3) blur(10px);
+  border-bottom: 1px solid var(--ma-hairline);
+}
+.channel-header h3, #channel-header-name { font-family: var(--font-heading); letter-spacing:-.2px; font-weight:700; }
+
+/* Welcome / empty state → a designed hero */
+.welcome-screen { position: relative; }
+.welcome-screen::before {
+  content:''; position:absolute; left:50%; top:42%; width:520px; height:520px; transform:translate(-50%,-50%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent), transparent 62%);
+  filter: blur(24px); pointer-events:none; z-index:0;
+}
+.welcome-content {
+  position: relative; z-index: 1;
+  max-width: 560px; padding: 44px 46px; border-radius: 28px;
+  background: color-mix(in srgb, var(--bg-secondary) 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
+  backdrop-filter: blur(12px) saturate(1.2); -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: var(--ma-shadow-lg);
+}
+.welcome-icon {
+  font-size: 4.4rem; line-height: 1; margin-bottom: 12px; display:inline-block;
+  background: var(--ma-grad); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  filter: drop-shadow(0 0 30px var(--accent-glow));
+  animation: ma-float 6.5s ease-in-out infinite;
+}
+.welcome-content h2 {
+  font-family: var(--ma-display); font-weight: 700; font-size: 2.05rem; letter-spacing:-.4px; margin:.2em 0 .35em;
+  background: linear-gradient(92deg, var(--text-primary), color-mix(in srgb, var(--accent) 70%, var(--text-primary)));
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+.welcome-content p { color: var(--text-secondary); font-size: 1.02rem; line-height: 1.6; }
+
+/* Composer — elevated rounded field with a focus glow */
+.message-input-area, [data-haven-region="composer"] {
+  background: var(--ma-glass); border-top: 1px solid var(--ma-hairline);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+#message-input, .message-input {
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--bg-tertiary) 80%, transparent) !important;
+  border: 1px solid var(--border) !important;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+#message-input:focus, .message-input:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border)) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--ma-glow) !important;
+}
+
+/* ══ Right panel — cards for voice + online ═════════════════════════ */
+.right-sidebar, .right-sidebar-voice, .right-sidebar-users,
+[data-haven-region="member-list"], [data-haven-region="voice-roster"] {
+  background: linear-gradient(180deg, var(--bg-secondary), color-mix(in srgb, var(--bg-secondary) 92%, #000 8%));
+  border-left: 1px solid var(--ma-hairline);
+}
+.right-sidebar-voice .panel, .right-sidebar-users .panel {
+  border-radius: 14px;
+}
+.panel-title .title-emoji { filter: drop-shadow(0 0 6px var(--accent-glow)); }
+.user-list .user-item:hover, .member-item:hover, .user-row:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 10px;
+}
+
+/* ══ Buttons / inputs / modals — cohesive premium finish ════════════ */
+.btn-accent, .btn-send, .thread-send-btn, .btn-admin-save, .btn-voice, .btn-primary {
+  background: var(--ma-grad) !important; color: #fff !important; border: none !important;
+  box-shadow: 0 4px 16px -4px var(--accent-glow);
+}
+.btn-accent:hover, .btn-send:hover, .thread-send-btn:hover, .btn-admin-save:hover, .btn-voice:hover, .btn-primary:hover {
+  filter: brightness(1.06); transform: translateY(-1px);
+  box-shadow: 0 8px 24px -6px var(--accent-glow), var(--ma-glow-violet);
+}
+.modal, .modal-content, .settings-modal, [data-haven-region="modal"] {
+  border: 1px solid var(--ma-hairline) !important;
+  box-shadow: var(--ma-shadow-lg) !important;
+  border-radius: var(--ma-radius-lg) !important;
+}
+.modal::before, .modal-content::before {
+  content:''; position:absolute; inset:0 0 auto 0; height:2px; border-radius: var(--ma-radius-lg) var(--ma-radius-lg) 0 0;
+  background: var(--ma-grad); opacity:.9; pointer-events:none;
+}
+.modal, .modal-content { position: relative; }
+
+/* Join Voice pill in the header/right panel */
+#join-voice-btn, .join-voice-btn, .btn-voice {
+  border-radius: var(--ma-radius-pill);
+}
+
+/* ══ Motion ═════════════════════════════════════════════════════════ */
+@keyframes ma-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes ma-pulse { 0%,100% { opacity:1; } 50% { opacity:.55; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-icon { animation: none; }
+  .server-icon, .sidebar-bottom-btn, .btn-accent, .btn-send, .channel-item { transition: none !important; }
+  .server-icon:hover, .sidebar-bottom-btn:hover, .btn-accent:hover { transform: none !important; }
+}
+
+/* ══ Small-screen safety: the tile grid + hero stay tidy on mobile ══ */
+@media (max-width: 720px) {
+  .welcome-content { padding: 30px 24px; max-width: 92vw; }
+  .welcome-icon { font-size: 3.4rem; }
+  .sidebar-bottom-bar { grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MSG ARENA — OVERHAUL POLISH PASS  (adds energy; refines details)
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Cleaner section labels — the collapse arrow is enough; drop the extra tick */
+.section-label .section-label-text::before { content: none; }
+
+/* More life in the backdrop aurora */
+#app-body, [data-haven-region="workspace"], [data-haven-region="app-shell"] {
+  background:
+    radial-gradient(900px 540px at 3% -14%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 60%),
+    radial-gradient(860px 660px at 109% 0%, color-mix(in srgb, var(--ma-accent-2) 17%, transparent), transparent 58%),
+    radial-gradient(820px 820px at 55% 134%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 56%),
+    var(--bg-primary);
+}
+
+/* Welcome hero → a living centerpiece: bigger mark + a soft rotating glow ring */
+.welcome-content { padding: 52px 54px; }
+.welcome-icon { font-size: 5rem; position: relative; z-index: 2; }
+.welcome-screen::after {
+  content:''; position:absolute; left:50%; top:41%; width:280px; height:280px; transform:translate(-50%,-50%);
+  border-radius:50%; pointer-events:none; z-index:0;
+  background: conic-gradient(from 0deg,
+    transparent, color-mix(in srgb,var(--accent) 34%,transparent), transparent 42%,
+    color-mix(in srgb,var(--ma-accent-2) 34%,transparent), transparent 78%);
+  filter: blur(28px); opacity:.6; animation: ma-spin 16s linear infinite;
+}
+@keyframes ma-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+/* Channel header hairline gradient underglow */
+.channel-header, [data-haven-region="channel-header"] { position: relative; }
+.channel-header::after {
+  content:''; position:absolute; left:0; right:0; bottom:-1px; height:1px; pointer-events:none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb,var(--accent) 55%,transparent),
+              color-mix(in srgb,var(--ma-accent-2) 45%,transparent), transparent);
+  opacity:.55;
+}
+
+/* Keep the new motion reduced-motion safe */
+@media (prefers-reduced-motion: reduce) {
+  .welcome-screen::after { animation: none; }
+}

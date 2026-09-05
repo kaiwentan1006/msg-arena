@@ -1,0 +1,550 @@
+﻿<!DOCTYPE html>
+<html lang="en" data-haven-theme-api="1">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="A free, open-source, self-hosted messenger built for gamers: LFG matchmaking, tournaments & ladders, game clips, voice chat, leaderboards and achievements. Host your own gaming community server.">
+  <meta name="keywords" content="gaming chat, self-hosted messenger, discord alternative, LFG, party finder, tournaments, game clips, voice chat, leaderboards, gaming community server, gamer messenger">
+  <meta name="robots" content="%%ROBOTS%%">
+  <meta name="theme-color" content="#0f1119">
+  <meta name="author" content="%%SITE_NAME%%">
+  <link rel="canonical" href="%%CANONICAL%%">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="%%SITE_NAME%%">
+  <meta property="og:title" content="%%SITE_NAME%% — Self-Hosted Messenger for Gamers">
+  <meta property="og:description" content="LFG matchmaking, tournaments, clips, voice chat and leaderboards — a free, self-hosted messenger built for gamers.">
+  <meta property="og:url" content="%%CANONICAL%%">
+  <meta property="og:image" content="%%OG_IMAGE%%">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="%%SITE_NAME%% — the messenger built for gamers">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="%%SITE_NAME%% — Self-Hosted Messenger for Gamers">
+  <meta name="twitter:description" content="LFG matchmaking, tournaments, clips, voice chat and leaderboards — a free, self-hosted messenger built for gamers.">
+  <meta name="twitter:image" content="%%OG_IMAGE%%">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <title>%%SITE_NAME%% — Self-Hosted Messenger for Gamers</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cG9seWdvbiBwb2ludHM9IjUwLDMgOTMsMjggOTMsNzIgNTAsOTcgNyw3MiA3LDI4IiBmaWxsPSJub25lIiBzdHJva2U9IiMyMmQzZWUiIHN0cm9rZS13aWR0aD0iOCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjx0ZXh0IHg9IjUwIiB5PSI2NCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9IkFyaWFsLEhlbHZldGljYSxzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iYm9sZCIgZm9udC1zaXplPSIzNCIgZmlsbD0iIzIyZDNlZSIgb3BhY2l0eT0iMC45NyI+TTwvdGV4dD48L3N2Zz4=">
+  <link rel="stylesheet" href="/css/style.css?v=4.4.4">
+  <link rel="stylesheet" href="/css/msg-arena.css?v=4.4.4">
+  <script src="/js/theme-init.js"></script>
+  <script type="application/ld+json">%%JSONLD%%</script>
+</head>
+<body class="auth-page" data-haven-page="auth">
+
+  <div class="auth-container" data-haven-region="auth-shell">
+    <div class="auth-card" data-haven-region="auth-card">
+      <div class="auth-header" data-haven-region="auth-header">
+        <div class="logo">🎮</div>
+        <h1>MSG ARENA</h1>
+        <p class="tagline" data-i18n="auth.tagline">Private chat, your rules</p>
+        <p class="server-title" id="server-title"></p>
+      </div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" data-tab="login" data-i18n="auth.tabs.login">Login</button>
+        <button class="auth-tab" data-tab="register" data-i18n="auth.tabs.register">Register</button>
+        <button class="auth-tab" data-tab="sso" data-i18n="auth.tabs.sso">Link Server</button>
+      </div>
+
+      <form id="login-form" class="auth-form">
+        <div class="form-group">
+          <label for="login-username" data-i18n="auth.login.username_label">Username</label>
+          <input type="text" id="login-username" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="login-password" data-i18n="auth.login.password_label">Password</label>
+          <input type="password" id="login-password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn-primary" data-i18n="auth.login.submit">Login</button>
+        <div class="auth-recovery-links">
+          <a href="#" id="forgot-password-show" data-i18n="auth.login.forgot_password">Forgot password?</a>
+          <a href="#" id="admin-recover-show" data-i18n="auth.login.locked_out">Locked out? Admin recovery</a>
+        </div>
+        <div id="admin-recover-section" style="display:none;text-align:center;margin-top:6px">
+          <small style="color:var(--text-muted)" data-i18n="auth.login.admin_recover_hint">Enter your admin credentials above and click Recover</small><br>
+          <button type="button" class="btn-primary" id="admin-recover-btn" data-i18n="auth.login.admin_recover_btn" style="margin-top:6px;font-size:0.85rem;padding:6px 16px">Recover Admin Access</button>
+        </div>
+        <!-- (#12) SSO — only shown when the server has OIDC configured -->
+        <div id="oidc-login-section" style="display:none;text-align:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--border-color,#333)">
+          <button type="button" class="btn-secondary" id="oidc-login-btn" style="font-size:0.9rem;padding:8px 18px">Sign in with SSO</button>
+        </div>
+        <!-- (#5381) Guest login — only shown when the server has guests enabled -->
+        <div id="guest-login-section" style="display:none;text-align:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--border-color,#333)">
+          <small style="color:var(--text-muted);display:block;margin-bottom:6px">No account? Just want to look around?</small>
+          <button type="button" class="btn-secondary" id="guest-login-show-btn" style="font-size:0.9rem;padding:8px 18px">Join as Guest</button>
+        </div>
+      </form>
+
+      <!-- (#12) Encryption passphrase for SSO accounts.
+           Signing in through a provider means no password is ever typed into
+           MSG Arena, and the private key that decrypts DMs is wrapped with a key
+           derived from exactly that. So SSO users pick a separate passphrase
+           here. It never leaves this page: it is stretched with PBKDF2 and only
+           the derived key is kept, for this session. -->
+      <form id="e2e-pass-form" class="auth-form" style="display:none">
+        <h3 id="e2e-pass-title" style="text-align:center;margin-bottom:6px;font-size:1.05rem">Set an encryption passphrase</h3>
+        <p id="e2e-pass-blurb" style="text-align:center;color:var(--text-muted);font-size:0.85rem;margin-bottom:14px">
+          Your private messages are encrypted with a key only you hold. Signing in with SSO means MSG Arena never sees a
+          password to protect it with, so pick a passphrase. You will need it again on any other device.
+        </p>
+        <div class="form-group">
+          <label for="e2e-pass-input">Passphrase</label>
+          <input type="password" id="e2e-pass-input" autocomplete="new-password" minlength="8" maxlength="128" required>
+          <small id="e2e-pass-hint">At least 8 characters. Nobody can reset this for you, including the server admin.</small>
+        </div>
+        <div class="form-group" id="e2e-pass-confirm-group">
+          <label for="e2e-pass-confirm">Confirm passphrase</label>
+          <input type="password" id="e2e-pass-confirm" autocomplete="new-password" minlength="8" maxlength="128">
+        </div>
+        <button type="submit" class="btn-primary" id="e2e-pass-submit">Continue</button>
+        <p style="text-align:center;margin-top:10px">
+          <a href="#" id="e2e-pass-skip" style="font-size:0.85rem;color:var(--text-muted)">Skip for now</a>
+        </p>
+      </form>
+
+      <!-- (#5381) Guest username prompt — appears after clicking Join as Guest -->
+      <form id="guest-form" class="auth-form" style="display:none">
+        <p style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:12px">
+          Pick a temporary username. No password, no recovery. Your account is wiped when you disconnect.
+        </p>
+        <div class="form-group">
+          <label for="guest-username">Username</label>
+          <input type="text" id="guest-username" autocomplete="off" minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+" required>
+          <small>3-20 characters, letters/numbers/underscores</small>
+        </div>
+        <button type="submit" class="btn-primary">Join as Guest</button>
+        <p style="text-align:center;margin-top:8px">
+          <a href="#" id="guest-back-btn" style="color:var(--text-muted);font-size:0.8rem;text-decoration:none">← Back to login</a>
+        </p>
+      </form>
+
+      <form id="register-form" class="auth-form" style="display:none">
+        <div class="form-group">
+          <label for="reg-username" data-i18n="auth.register.username_label">Username</label>
+          <input type="text" id="reg-username" autocomplete="username"
+                 minlength="3" maxlength="20" pattern="[a-zA-Z0-9_]+" required>
+          <small data-i18n="auth.register.username_hint">3-20 characters, letters/numbers/underscores</small>
+        </div>
+        <div class="form-group">
+          <label for="reg-password" data-i18n="auth.register.password_label">Password</label>
+          <input type="password" id="reg-password" autocomplete="new-password"
+                 minlength="8" required>
+          <small data-i18n="auth.register.password_hint">Minimum 8 characters</small>
+        </div>
+        <div class="form-group">
+          <label for="reg-confirm" data-i18n="auth.register.confirm_label">Confirm Password</label>
+          <input type="password" id="reg-confirm" autocomplete="new-password" required>
+        </div>
+        <!-- (#5344) Registration token field — shown by auth.js only when the server requires it -->
+        <div class="form-group" id="reg-token-group" style="display:none">
+          <label for="reg-token">Invite Token</label>
+          <input type="text" id="reg-token" autocomplete="off" maxlength="64"
+                 placeholder="Paste the token your admin shared">
+          <small>Required by this server — ask the admin if you don't have one.</small>
+        </div>
+        <!-- Opt-in Cloudflare Turnstile CAPTCHA — shown by auth.js only when the server enables it -->
+        <div class="form-group" id="reg-captcha-group" style="display:none">
+          <div id="reg-captcha"></div>
+        </div>
+        <button type="submit" class="btn-primary" data-i18n="auth.register.submit">Create Account</button>
+      </form>
+
+      <!-- SSO form: register using identity from another MSG Arena server -->
+      <div id="sso-form" class="auth-form" style="display:none">
+        <p style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:16px;">
+          <span data-i18n="auth.sso.instruction">Register using your account from another MSG Arena server. Your username and profile picture will be imported.</span>
+        </p>
+
+        <!-- Step 1: Enter home server URL -->
+        <div id="sso-step-server">
+          <div class="form-group">
+            <label for="sso-server-url" data-i18n="auth.sso.server_label">Your MSG Arena server</label>
+            <input type="text" id="sso-server-url" list="sso-recent-servers" placeholder="your-server.example.com" required>
+            <datalist id="sso-recent-servers"></datalist>
+            <small data-i18n="auth.sso.server_hint">Enter the address of the MSG Arena server you already have an account on</small>
+          </div>
+          <button type="button" class="btn-primary" id="sso-connect-btn" data-i18n="auth.sso.connect">Connect</button>
+        </div>
+
+        <!-- Step 2: SSO result + set local password -->
+        <div id="sso-step-register" style="display:none">
+          <div class="sso-profile-preview" style="text-align:center;margin-bottom:16px;padding:12px;background:var(--bg-tertiary,#12122a);border-radius:8px;border:1px solid var(--border,#333)">
+            <div id="sso-preview-avatar" style="width:64px;height:64px;border-radius:50%;margin:0 auto 8px;background:var(--bg-secondary,#1a1a2e);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--text-muted)">?</div>
+            <div id="sso-preview-username" style="font-weight:600;font-size:15px;color:var(--text-primary)">—</div>
+            <small style="color:var(--text-muted);font-size:11px" data-i18n="auth.sso.imported_from">Imported from your home server</small>
+          </div>
+          <div class="form-group">
+            <label for="sso-password" data-i18n="auth.sso.password_label">Set a password for this server</label>
+            <input type="password" id="sso-password" autocomplete="new-password" minlength="8" required>
+            <small data-i18n="auth.sso.password_hint">Required for encryption. Minimum 8 characters.</small>
+          </div>
+          <div class="form-group">
+            <label for="sso-confirm" data-i18n="auth.sso.confirm_label">Confirm Password</label>
+            <input type="password" id="sso-confirm" autocomplete="new-password" required>
+          </div>
+          <!-- Opt-in Turnstile CAPTCHA — shown by auth.js only when the server enables it -->
+          <div class="form-group" id="sso-captcha-group" style="display:none">
+            <div id="sso-captcha"></div>
+          </div>
+          <button type="button" class="btn-primary" id="sso-register-btn" data-i18n="auth.sso.register">Create Account</button>
+          <p style="text-align:center;margin-top:8px">
+            <a href="#" id="sso-back-btn" style="color:var(--text-muted);font-size:0.8rem;text-decoration:none" data-i18n="auth.sso.back">← Start over</a>
+          </p>
+        </div>
+      </div>
+
+      <div id="auth-error" class="auth-error" style="display:none"></div>
+
+      <!-- TOTP verification form (shown after login when 2FA is enabled) -->
+      <form id="totp-form" class="auth-form" style="display:none">
+        <p style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:12px;">
+          <span data-i18n="auth.totp.instruction">🔐 Enter the 6-digit code from your authenticator app</span>
+        </p>
+        <div class="form-group">
+          <label for="totp-code" data-i18n="auth.totp.code_label">Authentication Code</label>
+          <input type="text" id="totp-code" autocomplete="one-time-code" inputmode="numeric"
+                 pattern="[0-9]*" maxlength="10" placeholder="000000" required
+                 style="text-align:center;font-size:1.4rem;letter-spacing:0.3em">
+        </div>
+        <button type="submit" class="btn-primary" data-i18n="auth.totp.submit">Verify</button>
+        <p style="text-align:center;margin-top:8px">
+          <a href="#" id="totp-use-backup" data-i18n="auth.totp.use_backup" style="color:var(--text-muted);font-size:0.8rem;text-decoration:none">Use a backup code instead</a>
+        </p>
+        <p style="text-align:center;margin-top:4px">
+          <a href="#" id="totp-back-btn" data-i18n="auth.totp.back" style="color:var(--text-muted);font-size:0.8rem;text-decoration:none">← Back to login</a>
+        </p>
+      </form>
+
+      <!-- Forced change-password form, shown when an admin reset the account (#5300) -->
+      <form id="forced-change-form" class="auth-form" style="display:none">
+        <p style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:12px;">
+          <span data-i18n="auth.forced_change.instruction">🔒 An admin reset your password. Set a new one to continue.</span>
+        </p>
+        <div style="background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.4);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.8rem;color:var(--text-secondary)"
+             data-i18n-html="auth.forced_change.dm_warning">
+          ⚠️ Setting a new password here will <strong>permanently erase your encrypted DM history</strong>. The wrap key is derived from your password, so old DMs become unreadable once the password rotates. If you still remember your <em>original</em> password, expand the section below to cancel the reset and keep your DMs intact.
+        </div>
+        <div class="form-group">
+          <label for="forced-new-password" data-i18n="auth.forced_change.new_password_label">New Password</label>
+          <input type="password" id="forced-new-password" autocomplete="new-password" minlength="8" maxlength="128">
+          <small data-i18n="auth.forced_change.new_password_hint">Minimum 8 characters</small>
+        </div>
+        <div class="form-group">
+          <label for="forced-confirm-password" data-i18n="auth.forced_change.confirm_password_label">Confirm New Password</label>
+          <input type="password" id="forced-confirm-password" autocomplete="new-password" minlength="8" maxlength="128">
+        </div>
+        <details id="forced-change-recall" style="margin:8px 0 12px 0;border:1px solid var(--border-color,#444);border-radius:8px;padding:6px 10px;">
+          <summary style="cursor:pointer;font-size:0.85rem;color:var(--text-secondary)" data-i18n="auth.forced_change.recall_summary">I actually remember my original password (preserve my DMs)</summary>
+          <p style="font-size:0.78rem;color:var(--text-muted);margin:8px 0;" data-i18n="auth.forced_change.recall_hint">Enter your original password below. If it matches, the admin reset is cancelled and you sign in normally with no password change. Your encrypted DM history stays intact.</p>
+          <div class="form-group">
+            <label for="forced-old-password" data-i18n="auth.forced_change.old_password_label">Original Password</label>
+            <input type="password" id="forced-old-password" autocomplete="current-password" maxlength="128">
+          </div>
+        </details>
+        <button type="submit" class="btn-primary" data-i18n="auth.forced_change.submit">Continue</button>
+      </form>
+
+      <!-- Account Recovery / Forgot Password form -->
+      <form id="recover-form" class="auth-form" style="display:none">
+        <p style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:12px;">
+          <span data-i18n="auth.recover.instruction">🔑 Reset password with a recovery code</span>
+        </p>
+        <div style="background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.4);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.8rem;color:var(--text-secondary)"
+             data-i18n-html="auth.recover.warning">
+          ⚠️ This will <strong>permanently erase your encryption keys</strong>. All encrypted DM history will be unreadable.
+        </div>
+        <div class="form-group">
+          <label for="recover-username" data-i18n="auth.recover.username_label">Username</label>
+          <input type="text" id="recover-username" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+          <label for="recover-code" data-i18n="auth.recover.code_label">Recovery Code</label>
+          <input type="text" id="recover-code" placeholder="XXXX-XXXX" maxlength="9"
+                 style="font-family:monospace;letter-spacing:0.1em" autocomplete="off" required>
+        </div>
+        <div class="form-group">
+          <label for="recover-new-password" data-i18n="auth.recover.new_password_label">New Password</label>
+          <input type="password" id="recover-new-password" autocomplete="new-password" minlength="8" required>
+          <small data-i18n="auth.recover.new_password_hint">Minimum 8 characters</small>
+        </div>
+        <div class="form-group">
+          <label for="recover-confirm-password" data-i18n="auth.recover.confirm_label">Confirm New Password</label>
+          <input type="password" id="recover-confirm-password" autocomplete="new-password" required>
+        </div>
+        <button type="submit" class="btn-primary" data-i18n="auth.recover.submit">Reset Password</button>
+        <p style="text-align:center;margin-top:8px">
+          <a href="#" id="recover-back-btn" data-i18n="auth.recover.back" style="color:var(--text-muted);font-size:0.8rem;text-decoration:none">← Back to login</a>
+        </p>
+      </form>
+
+      <!-- Ban appeal form (#5457), shown when a login is rejected with a ban -->
+      <form id="ban-appeal-form" class="auth-form" style="display:none">
+        <p style="text-align:center;color:var(--text-muted);font-size:0.9rem;margin-bottom:12px;">
+          <span data-i18n="auth.ban_appeal.instruction">🚫 Your account is banned from this server.</span>
+        </p>
+        <div id="ban-appeal-reason" style="background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.4);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:0.85rem;color:var(--text-secondary)"></div>
+        <div class="form-group">
+          <label for="ban-appeal-text" data-i18n="auth.ban_appeal.text_label">Appeal to the admins</label>
+          <textarea id="ban-appeal-text" maxlength="2000" rows="5" required style="resize:vertical"
+                    data-i18n-placeholder="auth.ban_appeal.text_placeholder"
+                    placeholder="Explain why you think the ban should be lifted..."></textarea>
+          <small data-i18n="auth.ban_appeal.text_hint">The server admins will see this next to your ban. Max 2000 characters.</small>
+        </div>
+        <button type="submit" class="btn-primary" data-i18n="auth.ban_appeal.submit">Submit Appeal</button>
+        <p style="text-align:center;margin-top:8px">
+          <a href="#" id="ban-appeal-back-btn" data-i18n="auth.ban_appeal.back" style="color:var(--text-muted);font-size:0.8rem;text-decoration:none">← Back to login</a>
+        </p>
+      </form>
+
+      <!-- EULA acceptance (required before login/register) -->
+      <div class="eula-notice" id="eula-notice">
+        <label class="eula-check-row">
+          <input type="checkbox" id="age-checkbox">
+          <span data-i18n-html="auth.eula.age_confirm">I confirm that I am <strong>18 years of age or older</strong> (or the age of legal majority in my jurisdiction)</span>
+        </label>
+        <label class="eula-check-row">
+          <input type="checkbox" id="eula-checkbox">
+          <span data-i18n-html="auth.eula.tos_confirm">I have read and agree to the <a href="#" id="eula-link">Terms of Service &amp; Release of Liability Agreement</a></span>
+        </label>
+      </div>
+
+      <!-- Theme selector on login page -->
+      <div class="auth-theme-bar" id="auth-theme-bar" data-haven-region="theme-picker">
+        <button class="theme-btn active" data-theme="haven" title="MSG Arena"><span class="theme-icon">🎮</span></button>
+        <button class="theme-btn" data-theme="discord" title="Discord"><span class="theme-icon">🎮</span></button>
+        <button class="theme-btn" data-theme="matrix" title="Matrix"><span class="theme-icon">Ⅿ</span></button>
+        <button class="theme-btn" data-theme="tron" title="Tron"><span class="theme-icon">◈</span></button>
+        <button class="theme-btn" data-theme="halo" title="HALO"><span class="theme-icon">⌁</span></button>
+        <button class="theme-btn" data-theme="lotr" title="LoTR"><span class="theme-icon">⚜</span></button>
+        <button class="theme-btn" data-theme="cyberpunk" title="Cyberpunk"><span class="theme-icon">⚡</span></button>
+        <button class="theme-btn" data-theme="nord" title="Nord"><span class="theme-icon">❄</span></button>
+        <button class="theme-btn" data-theme="dracula" title="Dracula"><span class="theme-icon">🧛</span></button>
+        <button class="theme-btn" data-theme="bloodborne" title="Bloodborne"><span class="theme-icon">🩸</span></button>
+        <button class="theme-btn" data-theme="darksouls" title="Dark Souls"><span class="theme-icon">🔥</span></button>
+        <button class="theme-btn" data-theme="eldenring" title="Elden Ring"><span class="theme-icon">💍</span></button>
+        <button class="theme-btn" data-theme="ice" title="Ice"><span class="theme-icon">🧊</span></button>
+        <button class="theme-btn" data-theme="abyss" title="Abyss"><span class="theme-icon">🌊</span></button>
+        <button class="theme-btn" data-theme="minecraft" title="Minecraft"><span class="theme-icon">⛏️</span></button>
+        <button class="theme-btn" data-theme="ffx" title="Final Fantasy X"><span class="theme-icon">⚔️</span></button>
+        <button class="theme-btn" data-theme="zelda" title="Zelda"><span class="theme-icon">🗡️</span></button>
+        <button class="theme-btn" data-theme="fallout" title="Fallout (PIP Boy)"><span class="theme-icon">☢️</span></button>
+        <button class="theme-btn" data-theme="scripture" title="Scripture"><span class="theme-icon">✝️</span></button>
+        <button class="theme-btn" data-theme="chapel" title="Chapel"><span class="theme-icon">⛪</span></button>
+        <button class="theme-btn" data-theme="gospel" title="Gospel"><span class="theme-icon">🕊️</span></button>
+        <button class="theme-btn" data-theme="midnightpurple" title="Midnight Purple"><span class="theme-icon">🔮</span></button>
+        <button class="theme-btn" data-theme="crt" title="CRT"><span class="theme-icon">📺</span></button>
+        <button class="theme-btn" data-theme="win95" title="Windows 95"><span class="theme-icon">🪟</span></button>
+        <button class="theme-btn" data-theme="custom" title="Custom"><span class="theme-icon" id="custom-theme-swatch">🎨</span></button>
+        <button class="theme-btn" data-theme="rgb" title="RGB"><span class="theme-icon">🌈</span></button>
+        <button class="theme-btn" data-theme="daylight" title="Daylight (Light)"><span class="theme-icon">☀️</span></button>
+        <button class="theme-btn" data-theme="cloudy" title="Cloudy (Light)"><span class="theme-icon">☁️</span></button>
+      </div>
+      <div class="auth-lang-bar">
+        <select id="auth-lang-select" class="settings-select">
+          <option value="auto" data-i18n="settings.language_section.auto">Automatic</option>
+          <option value="en">English</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="es">Español</option>
+          <option value="pl">Polski</option>
+          <option value="ru">Русский</option>
+          <option value="zh">中文</option>
+          <option value="pt">Português (Brasil)</option>
+        </select>
+      </div>
+      <p class="auth-version" id="auth-version"></p>
+    </div>
+  </div>
+
+  <!-- EULA Modal -->
+  <div class="modal-overlay" id="eula-modal" style="display:none">
+    <div class="modal eula-modal">
+      <h3>⚖️ Terms of Service &amp; Release of Liability Agreement</h3>      <div id="custom-tos-section" style="display:none">
+        <div class="eula-content" id="custom-tos-content" style="margin-bottom:0;border-bottom:1px solid var(--border,#444);padding-bottom:16px;"></div>
+        <p style="text-align:center;font-size:12px;color:var(--text-muted,#888);margin:12px 0;">── Default MSG Arena Terms of Service ──</p>
+      </div>      <div class="eula-content">
+        <p><strong>MSG ARENA — TERMS OF SERVICE, END USER LICENSE AGREEMENT &amp; RELEASE OF LIABILITY</strong></p>
+        <p><em>Effective Date: February 12, 2026 &nbsp;|&nbsp; Version 2.0</em></p>
+
+        <p>By accessing, registering for, or using this MSG Arena server instance
+        (the &quot;Service&quot;), you (&quot;User,&quot; &quot;you,&quot; or &quot;your&quot;) acknowledge that you have
+        read, understood, and agree to be legally bound by the following terms and
+        conditions (&quot;Agreement&quot;). If you do not agree to every provision of this
+        Agreement, you must immediately cease all use of the Service.</p>
+
+        <h4>1. AGE RESTRICTION &amp; ELIGIBILITY</h4>
+        <p>1.1. <strong>Minimum Age.</strong> You must be at least <strong>eighteen
+        (18) years of age</strong> — or the age of legal majority in your
+        jurisdiction, whichever is greater — to access or use the Service. By
+        checking the age-confirmation box and using the Service, you represent
+        and warrant that you meet this requirement.</p>
+        <p>1.2. <strong>Parental Notice.</strong> The Service is not intended for
+        individuals under 18. We do not knowingly collect personal information
+        from minors. If we learn that a minor has provided personal information,
+        we will delete that information and terminate the associated account
+        without notice.</p>
+        <p>1.3. <strong>Legal Capacity.</strong> You represent that you have the
+        legal capacity to enter into a binding agreement in your jurisdiction.</p>
+
+        <h4>2. DESCRIPTION OF SERVICE</h4>
+        <p>2.1. MSG Arena is self-hosted, open-source communication software provided
+        under the AGPL-3.0 license. The Service enables text messaging, voice
+        communication, file sharing, and related features between consenting
+        adult users on a privately operated server instance.</p>
+        <p>2.2. <strong>Work in Progress.</strong> The software is provided in an
+        active state of development. Features may be incomplete, unstable, or
+        subject to change without notice.</p>
+
+        <h4>3. NO WARRANTY</h4>
+        <p>3.1. THE SERVICE IS PROVIDED <strong>&quot;AS IS&quot;</strong> AND <strong>&quot;AS
+        AVAILABLE&quot;</strong>, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+        INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR
+        A PARTICULAR PURPOSE, NON-INFRINGEMENT, ACCURACY, RELIABILITY, OR
+        AVAILABILITY.</p>
+        <p>3.2. The Providers (defined below) do not warrant that the Service
+        will be uninterrupted, error-free, secure, or free from harmful
+        components.</p>
+
+        <h4>4. ASSUMPTION OF RISK</h4>
+        <p>4.1. You <strong>voluntarily assume all risk</strong> associated with
+        your use of the Service, including but not limited to: data loss, service
+        interruptions, security vulnerabilities, exposure to objectionable or
+        unlawful content posted by other users, and any consequences arising from
+        communications conducted through the Service.</p>
+        <p>4.2. You acknowledge that the Service involves real-time, user-generated
+        content that is not pre-screened, moderated by artificial intelligence, or
+        guaranteed to be free of harmful material.</p>
+
+        <h4>5. RELEASE OF LIABILITY &amp; LIMITATION OF DAMAGES</h4>
+        <p>5.1. <strong>Release.</strong> To the fullest extent permitted by
+        applicable law, you hereby <strong>release, discharge, and hold
+        harmless</strong> the developer(s), server operator(s), host(s),
+        contributors, and any affiliated parties (collectively, &quot;Providers&quot;)
+        from any and all claims, demands, causes of action, damages, losses,
+        liabilities, costs, and expenses (including but not limited to
+        attorneys' fees) arising out of or related to:</p>
+        <ul>
+          <li>your use of, or inability to use, the Service;</li>
+          <li>any content transmitted, received, or stored through the Service;</li>
+          <li>unauthorized access to or alteration of your data;</li>
+          <li>the conduct of any third party on the Service;</li>
+          <li>any violation of this Agreement.</li>
+        </ul>
+        <p>5.2. <strong>Limitation.</strong> In no event shall the aggregate
+        liability of the Providers exceed the amount you paid to use the Service
+        (which is $0.00 for free software). In no event shall any Provider be
+        liable for indirect, incidental, special, consequential, or punitive
+        damages of any kind.</p>
+
+        <h4>6. INDEMNIFICATION</h4>
+        <p>6.1. You agree to <strong>indemnify, defend, and hold harmless</strong>
+        the Providers from and against any and all claims, liabilities, damages,
+        losses, costs, and expenses (including reasonable attorneys' fees) arising
+        from or related to: (a) your use of the Service; (b) your violation of
+        this Agreement; (c) your violation of any applicable law or regulation;
+        or (d) any content you transmit through the Service.</p>
+
+        <h4>7. USER CONDUCT &amp; CONTENT</h4>
+        <p>7.1. You are <strong>solely responsible</strong> for your conduct and
+        any content you create, transmit, or share through the Service.</p>
+        <p>7.2. You agree not to use the Service to: (a) violate any applicable
+        law or regulation; (b) transmit content that exploits or harms minors;
+        (c) harass, threaten, or abuse other users; (d) distribute malware or
+        engage in phishing; or (e) infringe on any third party's intellectual
+        property rights.</p>
+        <p>7.3. The server operator reserves the right to remove any content and
+        to restrict or terminate any user's access at any time, for any reason,
+        without prior notice.</p>
+
+        <h4>8. DATA HANDLING &amp; PRIVACY</h4>
+        <p>8.1. Messages, files, and user data are stored on the server
+        operator's hardware and managed at their sole discretion. <strong>No
+        guarantee of privacy, backup, retention, or confidentiality is
+        made.</strong></p>
+        <p>8.2. You acknowledge that communications on the Service may be
+        accessed by the server operator and are not end-to-end encrypted by
+        default.</p>
+        <p>8.3. MSG Arena does not transmit data to third-party analytics,
+        advertising, or tracking services. API calls to third-party services
+        (e.g., Tenor or GIPHY) are made only when explicitly triggered by user action.</p>
+        <p>8.4. You consent to the collection and storage of your IP address,
+        username, and agreement acceptance records for the purposes of
+        security, abuse prevention, and legal compliance.</p>
+
+        <h4>9. INTELLECTUAL PROPERTY</h4>
+        <p>9.1. MSG Arena software is licensed under the AGPL-3.0 License. You retain
+        ownership of content you create, but grant the server operator a
+        non-exclusive, royalty-free license to store, display, and transmit your
+        content as necessary to operate the Service.</p>
+        <p>9.2. You represent that you have the right to share any content you
+        upload and that such content does not infringe any third party's rights.</p>
+
+        <h4>10. DISPUTE RESOLUTION &amp; GOVERNING LAW</h4>
+        <p>10.1. <strong>Governing Law.</strong> This Agreement shall be governed
+        by and construed in accordance with the laws of the State in which the
+        server operator resides, without regard to conflict of law provisions.</p>
+        <p>10.2. <strong>Informal Resolution.</strong> Before initiating any
+        formal proceedings, you agree to first attempt to resolve any dispute
+        informally by contacting the server operator directly.</p>
+        <p>10.3. <strong>Limitation Period.</strong> Any claim arising out of
+        this Agreement must be brought within <strong>one (1) year</strong> of
+        the date on which the claim arose, or it is permanently barred.</p>
+        <p>10.4. <strong>Waiver of Class Action.</strong> You agree that any
+        dispute resolution proceedings will be conducted only on an individual
+        basis and not as a class, consolidated, or representative action.</p>
+
+        <h4>11. TERMINATION</h4>
+        <p>11.1. The server operator may terminate or suspend your access at
+        any time, with or without cause, with or without notice.</p>
+        <p>11.2. Upon termination, all rights granted to you under this
+        Agreement immediately cease. Sections 1, 3, 4, 5, 6, 8, 10, and 12
+        survive termination.</p>
+
+        <h4>12. GENERAL PROVISIONS</h4>
+        <p>12.1. <strong>Entire Agreement.</strong> This Agreement constitutes
+        the entire agreement between you and the Providers and supersedes all
+        prior agreements relating to the Service.</p>
+        <p>12.2. <strong>Severability.</strong> If any provision is found
+        unenforceable, the remaining provisions remain in full force and
+        effect.</p>
+        <p>12.3. <strong>Waiver.</strong> Failure to enforce any provision does
+        not constitute a waiver of that provision.</p>
+        <p>12.4. <strong>Modification.</strong> The Providers reserve the right
+        to modify this Agreement at any time. Continued use after changes are
+        posted constitutes acceptance. Material changes will be communicated
+        with a version number increment and, where feasible, an in-app notice.</p>
+        <p>12.5. <strong>No Legal Advice.</strong> This Agreement does not
+        constitute legal advice. If you require legal counsel, you should
+        consult a licensed attorney in your jurisdiction.</p>
+        <p>12.6. <strong>Assignment.</strong> You may not assign or transfer
+        your rights under this Agreement. The Providers may assign their rights
+        without restriction.</p>
+
+        <p class="eula-footer"><strong>BY CHECKING THE ACCEPTANCE BOXES AND USING
+        THIS SERVICE, YOU AFFIRM THAT YOU ARE AT LEAST 18 YEARS OLD (OR THE AGE
+        OF LEGAL MAJORITY IN YOUR JURISDICTION), THAT YOU HAVE READ AND
+        UNDERSTOOD THIS AGREEMENT IN ITS ENTIRETY, AND THAT YOU VOLUNTARILY
+        AGREE TO BE LEGALLY BOUND BY ALL OF ITS TERMS.</strong></p>
+
+        <p class="eula-footer"><em>If you do not agree to these terms, do not use
+        this Service.</em></p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-sm" id="eula-decline-btn" data-i18n="auth.eula.decline">Decline</button>
+        <button class="btn-sm btn-accent" id="eula-accept-btn" data-i18n="auth.eula.accept">I Accept</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/i18n.js"></script>
+  <script src="/js/theme.js"></script>
+  <script src="/js/auth.js"></script>
+  <script src="/js/password-eye.js?v=4.4.4"></script>
+</body>
+</html>

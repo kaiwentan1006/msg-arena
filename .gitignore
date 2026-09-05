@@ -1,0 +1,46 @@
+node_modules/
+haven.db
+haven.db-shm
+haven.db-wal
+.env
+certs/
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Data directory (should never be in the project, but just in case)
+uploads/
+
+# OS junk
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# Editor
+.vscode/
+*.swp
+*.swo
+*~
+.vs/
+
+# Flash game ROMs (optional download  not shipped with Haven)
+public/games/roms/*.swf
+
+
+# Firebase service account keys (never commit these)
+*adminsdk*.json
+*service-account*.json
+*firebase-admin*.json
+
+# Push relay runtime files
+haven-push-relay/node_modules/
+haven-push-relay/functions/node_modules/
+haven-push-relay/.env
+haven-push-relay/functions/service-account.json
+
+# Docker Compose override (local per-deployment config)
+docker-compose.override.yml
+
+# Build artifacts
+dist/
+backups/
+checklist-*.md

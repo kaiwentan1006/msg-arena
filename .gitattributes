@@ -1,0 +1,20 @@
+# Force Unix line endings for shell scripts so Docker builds
+# work regardless of the user's core.autocrlf setting.
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf
+Dockerfile text eol=lf
+* text=auto eol=lf
+
+# Force UTF-8 (with a working-tree BOM) on the public landing pages and
+# anything else that holds emoji. PowerShell 5.1's Set-Content defaults to
+# Windows-1252, which has silently corrupted these files multiple times
+# (every emoji becomes "?" / every em-dash becomes 0x97). The BOM makes the
+# encoding self-identifying so editors and PS5 won't round-trip them through
+# cp1252. See AGENT_INSTRUCTIONS.md ("Emoji / UTF-8 safety") for the workflow.
+docs/index.html        text working-tree-encoding=UTF-8 eol=lf
+website/index.html     text working-tree-encoding=UTF-8 eol=lf
+docs/support.html      text working-tree-encoding=UTF-8 eol=lf
+website/support.html   text working-tree-encoding=UTF-8 eol=lf
+CHANGELOG.md           text working-tree-encoding=UTF-8 eol=lf
+README.md              text working-tree-encoding=UTF-8 eol=lf
+GUIDE.md               text working-tree-encoding=UTF-8 eol=lf

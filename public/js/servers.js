@@ -1,0 +1,407 @@
+// ═══════════════════════════════════════════════════════════
+// MSG Arena — Multi-Server Manager
+// See other MSG Arena servers in your sidebar with live status
+// ═══════════════════════════════════════════════════════════
+
+class ServerManager {
+  constructor() {
+    this.servers = this._load();
+    this.statusCache = new Map();
+    this.checkInterval = null;
+    this.selfFingerprint = null;
+    this.selfFingerprintReady = this._fetchSelfFingerprint();
+    // Desktop bootstrap: pull the cross-server history from the Electron
+    // main process synchronously (preload exposes it as a plain array).
+    // This means the sidebar shows the user's known network IMMEDIATELY
+    // on first-join to a new server, instead of waiting for an async sync.
+    this.bootstrappedFromDesktop = this._mergeDesktopBootstrap();
+  }
+
+  /** Merge the Desktop app's cross-server history into the local list.
+   *  Returns true if any new servers were added. Removed-server tracking
+   *  is honored so the user doesn't see servers they intentionally deleted. */
+  _mergeDesktopBootstrap() {
+    try {
+      const history = (typeof window !== 'undefined' && window.havenDesktop && Array.isArray(window.havenDesktop.initialServerHistory))
+        ? window.havenDesktop.initialServerHistory
+        : null;
+      if (!history || !history.length) return false;
+      const removed = this._loadRemoved();
+      const have = new Set(this.servers.map(s => this._normalizeUrl(s.url)));
+      let added = false;
+      for (const h of history) {
+        if (!h || !h.url) continue;
+        const url = this._normalizeUrl(h.url);
+        if (!url || have.has(url) || removed.has(url) || removed.has(h.url)) continue;
+        this.servers.push({
+          name: h.name || url,
+          url,
+          icon: h.icon || null,
+          iconData: h.iconData || null,
+          addedAt: h.lastConnected || Date.now(),
+        });
+        have.add(url);
+        added = true;
+      }
+      if (added) this._save();
+      return added;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Fetch the current server's fingerprint so we can hide "self" from the sidebar. */
+  async _fetchSelfFingerprint() {
+    try {
+      const res = await fetch('/api/health');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.fingerprint) this.selfFingerprint = data.fingerprint;
+      }
+    } catch {}
+  }
+
+  _load() {
+    try {
+      const raw = JSON.parse(localStorage.getItem('haven_servers') || '[]');
+      // Normalize URLs on load to dedup legacy entries while preserving
+      // subpath-hosted servers like https://host/community.
+      const seen = new Set();
+      const deduped = [];
+      for (const s of raw) {
+        const normalizedUrl = this._normalizeUrl(s?.url || '');
+        if (!normalizedUrl || seen.has(normalizedUrl)) continue;
+        s.url = normalizedUrl;
+        seen.add(normalizedUrl);
+        deduped.push(s);
+      }
+      if (deduped.length !== raw.length) {
+        localStorage.setItem('haven_servers', JSON.stringify(deduped));
+      }
+      return deduped;
+    } catch { return []; }
+  }
+
+  _save() {
+    localStorage.setItem('haven_servers', JSON.stringify(this.servers));
+  }
+
+  add(name, url, icon = null, opts = {}) {
+    url = this._normalizeUrl(url);
+    if (this.servers.find(s => this._normalizeUrl(s.url) === url)) return false;
+
+    const removed = this._loadRemoved();
+    if (opts.userInitiated) {
+      // User explicitly adding — clear from removed set so sync won't fight it
+      if (removed.has(url)) {
+        removed.delete(url);
+        this._saveRemoved(removed);
+      }
+    } else if (removed.has(url)) {
+      // Bootstrap / sync path: never resurrect a server the user has removed.
+      // This was the root cause of removed servers (e.g. http://localhost:3000)
+      // re-appearing on every restart via the Desktop history merge.
+      return false;
+    }
+
+    this.servers.push({ name, url, icon, addedAt: Date.now() });
+    this._save();
+    this.checkServer(url);
+    return true;
+  }
+
+  update(url, updates) {
+    const normalizedUrl = this._normalizeUrl(url);
+    const server = this.servers.find(s => this._normalizeUrl(s.url) === normalizedUrl);
+    if (!server) return false;
+    if (updates.name !== undefined) server.name = updates.name;
+    if (updates.icon !== undefined) server.icon = updates.icon;
+    this._save();
+    return true;
+  }
+
+  remove(url) {
+    const normalizedUrl = this._normalizeUrl(url);
+    this.servers = this.servers.filter(s => this._normalizeUrl(s.url) !== normalizedUrl);
+    this.statusCache.delete(normalizedUrl);
+    this._save();
+    this.markRemoved(normalizedUrl);
+  }
+
+  /** Reorder servers by an array of URLs in the desired order. */
+  reorder(orderedUrls) {
+    const map = new Map(this.servers.map(s => [s.url, s]));
+    const reordered = [];
+    for (const url of orderedUrls) {
+      const s = map.get(url);
+      if (s) { reordered.push(s); map.delete(url); }
+    }
+    // Append any servers not in the ordered list (shouldn't happen, but safe)
+    for (const s of map.values()) reordered.push(s);
+    this.servers = reordered;
+    this._save();
+  }
+
+  getAll() {
+    return this.servers.map(s => ({
+      ...s,
+      status: this.statusCache.get(s.url) || { online: null, name: s.name }
+    }));
+  }
+
+  async checkServer(url) {
+    const normalizedUrl = this._normalizeUrl(url);
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+
+      const healthBase = normalizedUrl;
+
+      const res = await fetch(`${healthBase}/api/health`, {
+        signal: controller.signal,
+        mode: 'cors'
+      });
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        const data = await res.json();
+        const discoveredIcon = data.icon ? new URL(data.icon, `${healthBase}/`).toString() : null;
+        this.statusCache.set(normalizedUrl, {
+          online: true,
+          name: data.name || normalizedUrl,
+          icon: discoveredIcon,
+          version: data.version,
+          fingerprint: data.fingerprint || null,
+          checkedAt: Date.now()
+        });
+        // Persist discovered icon to the server entry so it survives
+        // across page reloads and offline periods
+        if (discoveredIcon) {
+          const entry = this.servers.find(s => this._normalizeUrl(s.url) === normalizedUrl);
+          if (entry) {
+            // Always update the icon URL (server may have changed its icon)
+            if (entry.icon !== discoveredIcon) {
+              entry.icon = discoveredIcon;
+              entry.iconData = null; // clear stale thumbnail
+              this._save();
+            }
+            // Generate a small base64 thumbnail so the icon travels
+            // with the encrypted sync bundle across servers
+            if (!entry.iconData) {
+              this._fetchIconThumbnail(discoveredIcon).then(dataUrl => {
+                if (dataUrl) { entry.iconData = dataUrl; this._save(); }
+              });
+            }
+          }
+        }
+      } else {
+        this.statusCache.set(normalizedUrl, { online: false, checkedAt: Date.now() });
+      }
+    } catch {
+      this.statusCache.set(normalizedUrl, { online: false, checkedAt: Date.now() });
+    }
+  }
+
+  async checkAll() {
+    await Promise.allSettled(this.servers.map(s => this.checkServer(s.url)));
+  }
+
+  startPolling(intervalMs = 30000) {
+    this.checkAll();
+    this.checkInterval = setInterval(() => this.checkAll(), intervalMs);
+  }
+
+  stopPolling() {
+    if (this.checkInterval) clearInterval(this.checkInterval);
+  }
+
+  // ── Encrypted server-side sync ───────────────────────
+  // Stores the server list as an AES-256-GCM blob on each MSG Arena server.
+  // wrappingHex: the 64-char hex string from HavenE2E.deriveWrappingKey()
+
+  /** Fetch a remote icon and shrink it to a tiny base64 data URL. */
+  async _fetchIconThumbnail(iconUrl) {
+    try {
+      const res = await fetch(iconUrl, { mode: 'cors', signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      if (!blob.type.startsWith('image/')) return null;
+      const bmp = await createImageBitmap(blob);
+      const size = 48;
+      const canvas = document.createElement('canvas');
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(bmp, 0, 0, size, size);
+      bmp.close();
+      return canvas.toDataURL('image/png');
+    } catch { return null; }
+  }
+
+  async syncWithServer(token, wrappingHex) {
+    if (!token || !wrappingHex) return;
+    try {
+      // 1. Fetch the encrypted blob from the server
+      const res = await fetch('/api/auth/user-servers', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const { blob } = await res.json();
+
+      // 2. Decrypt server-side list (if any)
+      let remoteServers = [];
+      if (blob) {
+        try {
+          const decrypted = await this._decryptBlob(blob, wrappingHex);
+          remoteServers = JSON.parse(decrypted);
+          if (!Array.isArray(remoteServers)) remoteServers = [];
+        } catch {
+          // Decryption failed — blob was encrypted with a different password
+          // or is corrupted. Start fresh from localStorage.
+          console.warn('[ServerSync] Could not decrypt server blob — using local list');
+        }
+      }
+
+      // 3. Load removed-servers set (removals are local-only, never synced)
+      const removed = this._loadRemoved();
+
+      // 4. Merge: union by URL, filtering out locally-removed servers
+      const localUrls = new Set(this.servers.map(s => this._normalizeUrl(s.url)));
+      const remoteUrls = new Set(remoteServers.map(s => this._normalizeUrl(s.url)));
+      let changed = false;
+
+      // Add remote servers we don't have locally (and haven't removed)
+      for (const rs of remoteServers) {
+        const normalizedUrl = this._normalizeUrl(rs.url);
+        if (!localUrls.has(rs.url) && !localUrls.has(normalizedUrl)
+            && !removed.has(rs.url) && !removed.has(normalizedUrl)) {
+          rs.url = normalizedUrl; // store the normalized form
+          this.servers.push(rs);
+          localUrls.add(normalizedUrl); // prevent duplicate adds within same sync
+          changed = true;
+        }
+      }
+
+      // Check if we have servers the remote doesn't
+      for (const ls of this.servers) {
+        if (!remoteUrls.has(ls.url)) changed = true;
+      }
+
+      // 5. Save merged list locally
+      if (changed) this._save();
+
+      // 6. Push updated encrypted blob back if our list is longer
+      if (changed || !blob) {
+        await this._pushToServer(token, wrappingHex);
+      }
+    } catch (err) {
+      console.warn('[ServerSync] Sync failed:', err.message);
+    }
+  }
+
+  async _pushToServer(token, wrappingHex) {
+    try {
+      const payload = JSON.stringify(this.servers.map(s => ({
+        url: s.url, name: s.name, icon: s.icon, iconData: s.iconData || null, addedAt: s.addedAt
+      })));
+      const blob = await this._encryptBlob(payload, wrappingHex);
+      await fetch('/api/auth/user-servers', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ blob })
+      });
+    } catch (err) {
+      console.warn('[ServerSync] Push failed:', err.message);
+    }
+  }
+
+  // ── Crypto helpers (AES-256-GCM with PBKDF2) ─────────
+
+  async _encryptBlob(plaintext, wrappingHex) {
+    const keyBytes = this._hexToBytes(wrappingHex);
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await this._deriveAESKey(keyBytes, salt);
+    const ct = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      new TextEncoder().encode(plaintext)
+    );
+    // Format: base64(salt + iv + ciphertext)
+    const combined = new Uint8Array(16 + 12 + ct.byteLength);
+    combined.set(salt, 0);
+    combined.set(iv, 16);
+    combined.set(new Uint8Array(ct), 28);
+    return btoa(String.fromCharCode(...combined));
+  }
+
+  async _decryptBlob(blob, wrappingHex) {
+    const keyBytes = this._hexToBytes(wrappingHex);
+    const raw = Uint8Array.from(atob(blob), c => c.charCodeAt(0));
+    const salt = raw.slice(0, 16);
+    const iv = raw.slice(16, 28);
+    const ct = raw.slice(28);
+    const key = await this._deriveAESKey(keyBytes, salt);
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+    return new TextDecoder().decode(pt);
+  }
+
+  async _deriveAESKey(keyBytes, salt) {
+    const raw = await crypto.subtle.importKey('raw', keyBytes, 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: 100_000 },
+      raw,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt', 'decrypt']
+    );
+  }
+
+  _hexToBytes(hex) {
+    const bytes = new Uint8Array(hex.length / 2);
+    for (let i = 0; i < hex.length; i += 2) {
+      bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+    }
+    return bytes;
+  }
+
+  /** Normalize a MSG Arena server URL to its base path (strips /app(.html), query, hash, trailing slash). */
+  _normalizeUrl(url) {
+    url = String(url || '').trim();
+    if (!url) return '';
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    try {
+      const parsed = new URL(url);
+      parsed.hash = '';
+      parsed.search = '';
+      let pathname = parsed.pathname || '/';
+      pathname = pathname.replace(/\/+$/, '') || '/';
+      pathname = pathname.replace(/\/app(?:\.html)?$/i, '') || '/';
+      pathname = pathname.replace(/\/+$/, '') || '/';
+      return pathname === '/' ? parsed.origin : parsed.origin + pathname;
+    } catch {
+      return url.replace(/\/+$/, '');
+    }
+  }
+
+  // ── Removed-servers tracking (local-only) ─────────────
+
+  _loadRemoved() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('haven_servers_removed') || '[]'));
+    } catch { return new Set(); }
+  }
+
+  _saveRemoved(set) {
+    localStorage.setItem('haven_servers_removed', JSON.stringify([...set]));
+  }
+
+  markRemoved(url) {
+    const normalizedUrl = this._normalizeUrl(url);
+    const removed = this._loadRemoved();
+    if (normalizedUrl) removed.add(normalizedUrl);
+    this._saveRemoved(removed);
+  }
+}

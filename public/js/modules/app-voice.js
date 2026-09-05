@@ -1,0 +1,3668 @@
+export default {
+
+// ── Voice ─────────────────────────────────────────────
+
+async _joinVoice() {
+  if (!this.currentChannel) return;
+  // Spam-click guard: while a join is already in-flight (waiting for mic
+  // permissions, ICE config fetch, getUserMedia), repeated clicks used to
+  // queue a fresh voice.join() per press. After a server restart, every
+  // buffered click then fired against the freshly-reconnected socket and
+  // produced a flood of "Joined voice chat" toasts plus duplicate
+  // voice-join / voice-leave server events. The flag is cleared in a
+  // finally block below regardless of outcome.
+  if (this._joiningVoice) return;
+  // If the socket is currently disconnected (e.g. user is mashing the
+  // button during a server restart) refuse to start — emits would be
+  // buffered by socket.io and replayed N times on reconnect, producing
+  // the multi-toast / multi-join behaviour. The auto-rejoin code in the
+  // 'connect' handler will re-join voice automatically once we're back.
+  if (this.socket && this.socket.connected === false) {
+    this._showToast('Disconnected — try again once reconnected', 'error');
+    return;
+  }
+  // Block voice join in text-only channels
+  const _jvChk = this.channels.find(c => c.code === this.currentChannel);
+  if (_jvChk && _jvChk.voice_enabled === 0) {
+    this._showToast(t('voice.disabled'), 'error');
+    return;
+  }
+  if (!this.user?.isAdmin && !this.user?.isGuest && !this._hasPerm('use_voice')) {
+    this._showToast('You do not have permission to use voice', 'error');
+    return;
+  }
+  this._joiningVoice = true;
+  // Visually disable the join buttons while the async pipeline runs so a
+  // human can't fire 15 of them. We restore disabled=false in finally.
+  const _joinBtns = [
+    document.getElementById('voice-join-btn'),
+    document.getElementById('voice-join-mobile')
+  ].filter(Boolean);
+  _joinBtns.forEach(b => { b.disabled = true; });
+  let success = false;
+  try {
+  // voice.join() auto-leaves old channel if connected
+  success = await this.voice.join(this.currentChannel);
+  if (success) {
+    const joinedCode = this.currentChannel;
+    const joinedUser = {
+      id: this.user.id,
+      username: this.user.displayName || this.user.username,
+      roleColor: this.user.roleColor || null,
+      isMuted: !!this.voice.isMuted,
+      isDeafened: !!this.voice.isDeafened
+    };
+
+    this._renderVoiceUsers([joinedUser], joinedCode);
+    this.voiceCounts[joinedCode] = Math.max(1, this.voiceCounts[joinedCode] || 0);
+    this.voiceChannelUsers[joinedCode] = [
+      joinedUser,
+      ...(this.voiceChannelUsers[joinedCode] || []).filter(u => u.id !== joinedUser.id)
+    ];
+    this._updateChannelVoiceIndicators();
+
+    this.notifications.playDirect('voice_join');
+    this._updateVoiceButtons(true);
+    this._syncMuteDeafenButtons();
+    this._updateVoiceStatus(true);
+    this._updateVoiceBar();
+    // Server's broadcastVoiceUsers (fired on our voice-join) prunes stale
+    // entries and emits both voice-users-update + voice-count-update, so
+    // the right panel and sidebar reconcile authoritatively a tick later.
+    // Don't emit get-voice-counts here — it can race the broadcast and
+    // re-seed the sidebar with stale counts on older builds.
+    this.socket.emit('request-voice-users', { code: joinedCode });
+    // Disable stream/music buttons if the channel has them off
+    const _jvCh = this.channels.find(c => c.code === this.currentChannel);
+    const _ssBtn = document.getElementById('screen-share-btn');
+    if (_ssBtn && _jvCh && _jvCh.streams_enabled === 0) {
+      _ssBtn.disabled = true;
+      _ssBtn.title = t('voice.streams_disabled');
+    }
+    const _camBtn = document.getElementById('voice-cam-btn');
+    if (_camBtn && _jvCh && _jvCh.streams_enabled === 0) {
+      _camBtn.disabled = true;
+      _camBtn.title = t('voice.streams_disabled');
+    }
+    const _musicBtn = document.getElementById('voice-listen-together-btn');
+    if (_musicBtn && _jvCh && _jvCh.music_enabled === 0) {
+      _musicBtn.disabled = true;
+      _musicBtn.title = t('voice.music_disabled');
+    }
+    this._showToast(t('voice.joined'), 'success');
+  } else {
+    this._showToast(t('voice.mic_error'), 'error');
+  }
+  } finally {
+    this._joiningVoice = false;
+    // _updateVoiceButtons(true) already hides the join buttons after a
+    // successful join; restoring disabled=false here is for the failure
+    // path where the button stays visible.
+    _joinBtns.forEach(b => { b.disabled = false; });
+  }
+},
+
+_leaveVoice() {
+  // Capture the channel BEFORE voice.leave() nulls currentChannel so we
+  // can immediately clear the right voice panel and sidebar count for it.
+  // Don't wait for the server's voice-users-update broadcast — if we left
+  // the voice room before the broadcast fires, it may not reach us, and
+  // the panel would stay stuck showing us as a participant (#5347).
+  const leftCode = this.voice && this.voice.currentChannel;
+  this.voice.leave();
+  this._mutedByDeafen = false;
+  this.notifications.playDirect('voice_leave');
+  this._updateVoiceButtons(false);
+  this._updateVoiceStatus(false);
+  this._updateVoiceBar();
+  this._hideMusicPanel();
+  // Optimistic local clear — mirrors the optimistic seed done in _joinVoice.
+  if (leftCode) {
+    delete this.voiceCounts[leftCode];
+    delete this.voiceChannelUsers[leftCode];
+    // Clear the right VOICE panel whenever it was bound to the channel we
+    // just left — including the case where we're reading a different text
+    // channel (DM etc.) while the panel was still showing the VC roster.
+    if (this.currentChannel === leftCode || this._lastVoiceUsersChannel === leftCode) {
+      this._renderVoiceUsers([], leftCode);
+    }
+    this._updateChannelVoiceIndicators();
+  }
+  this._showToast(t('voice.left'), 'info');
+  // Close the soundboard panel/popup/modal — sounds can't route to VC
+  // anymore, and the panel doubles as a 'you're in voice' affordance.
+  this._closeSoundboardForVoiceLeave?.();
+},
+
+_toggleMute() {
+  const wasMuted = this.voice.isMuted;
+  if (wasMuted && this._mutedByDeafen) {
+    // Mute was auto-applied by deafen — clear both together
+    if (this.voice.isMuted) this.voice.toggleMute();
+    if (this.voice.isDeafened) this.voice.toggleDeafen();
+    this._mutedByDeafen = false;
+    this.notifications.playDirect('mute_off');
+    if (this.voice.currentChannel) {
+      this.socket.emit('voice-mute-state', { code: this.voice.currentChannel, muted: false });
+      this.socket.emit('voice-deafen-state', { code: this.voice.currentChannel, deafened: false });
+    }
+  } else {
+    const muted = this.voice.toggleMute();
+    if (!muted) this._mutedByDeafen = false;
+    this.notifications.playDirect(muted ? 'mute_on' : 'mute_off');
+    if (this.voice.currentChannel) {
+      this.socket.emit('voice-mute-state', { code: this.voice.currentChannel, muted });
+    }
+  }
+  this._syncMuteDeafenButtons();
+  this._updateVoiceBar();
+},
+
+_toggleDeafen() {
+  const wasDeafened = this.voice.isDeafened;
+  if (wasDeafened) {
+    // Undeafening
+    this.voice.toggleDeafen();
+    if (this._mutedByDeafen) {
+      if (this.voice.isMuted) this.voice.toggleMute();
+      this._mutedByDeafen = false;
+      if (this.voice.currentChannel) {
+        this.socket.emit('voice-mute-state', { code: this.voice.currentChannel, muted: false });
+      }
+    }
+    this.notifications.playDirect('deafen_off');
+    if (this.voice.currentChannel) {
+      this.socket.emit('voice-deafen-state', { code: this.voice.currentChannel, deafened: false });
+    }
+  } else {
+    // Deafening
+    if (!this.voice.isMuted) {
+      this.voice.toggleMute();
+      this._mutedByDeafen = true;
+      if (this.voice.currentChannel) {
+        this.socket.emit('voice-mute-state', { code: this.voice.currentChannel, muted: true });
+      }
+    }
+    this.voice.toggleDeafen();
+    this.notifications.playDirect('deafen_on');
+    if (this.voice.currentChannel) {
+      this.socket.emit('voice-deafen-state', { code: this.voice.currentChannel, deafened: true });
+    }
+  }
+  this._syncMuteDeafenButtons();
+  this._updateVoiceBar();
+},
+
+// ── Voice UI reconciler ──────────────────────────────────
+//
+// The voice UI is written imperatively by _updateVoiceButtons/_updateVoiceStatus/
+// _updateVoiceBar from several unrelated call sites, and nothing ever recomputes
+// it. If it is torn down while the session is actually alive — which is what
+// produced "MSG Arena shows Join Voice but I can still hear and talk to everyone" —
+// the only way back is for the user to click Join Voice, which is a needless
+// renegotiation of a session that never broke.
+//
+// Note that _updateVoiceButtons(false) also empties #screen-share-grid outright,
+// which is why the stream vanished with no entry in the hidden-streams bar: the
+// tiles were destroyed, not hidden. The audio elements live in #audio-container
+// and are untouched, which is exactly why the stream's sound kept playing.
+//
+// This runs on a timer and on focus/resize and repairs whichever side is stale.
+// IMPORTANT: this is UI-only. It must NEVER emit voice-rejoin / voice-leave.
+// A previous revision did, and on window maximize that tore down live peers
+// via voice-existing-users (no skipRenegotiate) — the "instant disconnect
+// on first resize while streaming" bug.
+_reconcileVoiceUi() {
+  if (!this.voice) return;
+
+  // Fix the bookkeeping first if the media session says we're still in voice.
+  const repaired = this.voice.reassertSessionIfLive();
+
+  const peersLive = (this.voice.liveVoicePeerCount?.() || 0) > 0;
+  const micLive = !!(this.voice.localStream &&
+    this.voice.localStream.getTracks().some(t => t.readyState === 'live'));
+  const flagsInVoice = !!(this.voice.inVoice && this.voice.currentChannel);
+  // Media truth wins. Never paint "Join Voice" while peers/mic are live.
+  const sessionInVoice = flagsInVoice || peersLive || micLive;
+
+  const joinBtn = document.getElementById('voice-join-btn');
+  const joinVisible = !!joinBtn && joinBtn.style.display !== 'none';
+  const bar = document.getElementById('voice-bar');
+  const barShowsVoice = !!bar && bar.style.display !== 'none' && bar.style.display !== '';
+
+  // Already consistent.
+  if (!repaired && sessionInVoice && !joinVisible && barShowsVoice) return;
+  if (!repaired && !sessionInVoice && joinVisible && !barShowsVoice) return;
+
+  // Only repair UPWARD when media is live. Never tear UI down on a flaky
+  // layout read during maximize — that wiped stream tiles.
+  if (!sessionInVoice) {
+    // Genuinely idle — leave UI alone unless it still shows connected chrome.
+    if (!barShowsVoice && joinVisible) return;
+    // Bar still says connected but media is dead: clear chrome.
+    if (barShowsVoice || !joinVisible) {
+      console.warn('[Voice] UI shows voice but media is dead — clearing chrome');
+      this._updateVoiceButtons(false);
+      this._updateVoiceStatus(false);
+      this._updateVoiceBar();
+    }
+    return;
+  }
+
+  console.warn('[Voice] UI/session desync — repairing UI upward', {
+    flagsInVoice, peersLive, micLive, joinVisible, barShowsVoice, repaired
+  });
+
+  this._updateVoiceButtons(true);
+  this._updateVoiceStatus(true);
+  this._updateVoiceBar();
+  this._syncMuteDeafenButtons();
+
+  // Restore stream tiles if a prior false-leave wiped them. No signalling.
+  try {
+    const restored = this.voice.reassertScreenStreams?.();
+    if (restored) console.warn('[Voice] Restored', restored, 'stream tile(s) after UI desync');
+  } catch {}
+},
+
+_startVoiceUiReconciler() {
+  if (this._voiceUiReconcilerBound) return;
+  this._voiceUiReconcilerBound = true;
+  // Debounce resize heavily: maximize fires a burst of events. We only
+  // need to fix chrome after the layout settles — never mid-drag.
+  let resizeTimer = null;
+  const run = () => { try { this._reconcileVoiceUi(); } catch (e) { console.warn('[Voice] reconcile failed:', e); } };
+  const runDebounced = () => {
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(run, 300);
+  };
+  window.addEventListener('focus', runDebounced);
+  window.addEventListener('resize', runDebounced);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) runDebounced(); });
+  this._voiceUiReconcilerTimer = setInterval(run, 5000);
+},
+
+/** Update all mute/deafen button instances (sidebar + header) to reflect current state */
+_syncMuteDeafenButtons() {
+  const isMuted = this.voice.isMuted;
+  const isDeafened = this.voice.isDeafened;
+  ['voice-mute-btn', 'voice-mute-btn-header'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.textContent = '🎙️';
+    btn.title = isMuted ? 'Unmute' : 'Mute';
+    btn.classList.toggle('muted', isMuted);
+  });
+  ['voice-deafen-btn', 'voice-deafen-btn-header'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.textContent = isDeafened ? '🔇' : '🔊';
+    btn.title = isDeafened ? 'Undeafen' : 'Deafen';
+    btn.classList.toggle('muted', isDeafened);
+  });
+},
+
+_updateVoiceButtons(inVoice) {
+  document.getElementById('voice-join-btn').style.display = inVoice ? 'none' : 'inline-flex';
+  // Show/hide the header voice-active indicator (not a button, just a label)
+  const indicator = document.getElementById('voice-active-indicator');
+  if (indicator) indicator.style.display = inVoice ? 'inline-flex' : 'none';
+
+  // Show/hide the sidebar voice controls panel (pinned at bottom)
+  const voicePanel = document.getElementById('voice-panel');
+  if (voicePanel) voicePanel.style.display = inVoice ? 'flex' : 'none';
+
+  const useSidebar = localStorage.getItem('haven_sidebar_voice_controls') === 'true';
+
+  // Show/hide mute/deafen header buttons (voice panel — default location)
+  const voiceHeaderMute = document.getElementById('voice-mute-btn-header');
+  if (voiceHeaderMute) voiceHeaderMute.style.display = (inVoice && !useSidebar) ? '' : 'none';
+  const voiceHeaderDeafen = document.getElementById('voice-deafen-btn-header');
+  if (voiceHeaderDeafen) voiceHeaderDeafen.style.display = (inVoice && !useSidebar) ? '' : 'none';
+
+  // Show/hide mute/deafen sidebar buttons (opt-in)
+  const sidebarMute = document.getElementById('voice-mute-btn');
+  if (sidebarMute) sidebarMute.style.display = (inVoice && useSidebar) ? '' : 'none';
+  const sidebarDeafen = document.getElementById('voice-deafen-btn');
+  if (sidebarDeafen) sidebarDeafen.style.display = (inVoice && useSidebar) ? '' : 'none';
+
+  // Mobile voice join in right sidebar
+  // NOTE: must use setProperty('display', ..., 'important') because the mobile CSS
+  // rule .mobile-voice-join { display: flex !important; } would otherwise win and
+  // keep the button visible while already in voice (#5387).
+  const mobileJoin = document.getElementById('voice-join-mobile');
+  if (mobileJoin) {
+    if (inVoice) mobileJoin.style.setProperty('display', 'none', 'important');
+    else mobileJoin.style.removeProperty('display');
+  }
+
+  if (!inVoice) {
+    // Reset all mute/deafen buttons (sidebar + header)
+    ['voice-mute-btn', 'voice-mute-btn-header'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) { b.textContent = '🎙️'; b.title = t('voice.mute'); b.classList.remove('muted'); }
+    });
+    ['voice-deafen-btn', 'voice-deafen-btn-header'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) { b.textContent = '🔊'; b.title = t('voice.deafen'); b.classList.remove('muted'); }
+    });
+    document.getElementById('screen-share-btn').textContent = '🖥️';
+    document.getElementById('screen-share-btn').title = t('voice.screen_share');
+    document.getElementById('screen-share-btn').classList.remove('sharing');
+    document.getElementById('screen-share-btn').disabled = false;
+    document.getElementById('voice-cam-btn').textContent = '📷';
+    document.getElementById('voice-cam-btn').title = t('voice.panel.camera');
+    document.getElementById('voice-cam-btn').classList.remove('sharing');
+    document.getElementById('voice-cam-btn').disabled = false;
+    const _ltnBtn = document.getElementById('voice-listen-together-btn');
+    if (_ltnBtn) { _ltnBtn.disabled = false; _ltnBtn.title = t('voice.panel.listen_together'); }
+    document.getElementById('voice-ns-slider').value = localStorage.getItem('haven_ns_value') || 10;
+    // Hide voice settings sub-panel
+    const vsPanel = document.getElementById('voice-settings-panel');
+    if (vsPanel) vsPanel.style.display = 'none';
+    const vsBtn = document.getElementById('voice-settings-toggle');
+    if (vsBtn) vsBtn.classList.remove('active');
+
+    // Only destroy stream/webcam tiles when media is actually dead.
+    // A UI-only desync (maximize/resize flipping Join Voice on while
+    // WebRTC is still carrying the stream) used to wipe the grid here —
+    // audio kept playing with no tile and no way to restore without
+    // leave/rejoin. If peers or screen receivers are still live, leave
+    // the tiles alone; the reconciler will re-show the voice chrome.
+    const mediaStillLive = !!(this.voice && (
+      this.voice.inVoice ||
+      (this.voice.liveVoicePeerCount?.() || 0) > 0 ||
+      (this.voice.screenSharers && this.voice.screenSharers.size > 0) ||
+      (this.voice.localStream && this.voice.localStream.getTracks().some(t => t.readyState === 'live'))
+    ));
+    if (!mediaStillLive) {
+      const grid = document.getElementById('screen-share-grid');
+      if (grid) {
+        grid.querySelectorAll('video').forEach(v => { v.srcObject = null; });
+        grid.innerHTML = '';
+      }
+      const ssContainer = document.getElementById('screen-share-container');
+      if (ssContainer) ssContainer.style.display = 'none';
+      const wcGrid = document.getElementById('webcam-grid');
+      if (wcGrid) {
+        wcGrid.querySelectorAll('video').forEach(v => { v.srcObject = null; });
+        wcGrid.innerHTML = '';
+      }
+      const wcContainer = document.getElementById('webcam-container');
+      if (wcContainer) wcContainer.style.display = 'none';
+      this._stopSpeakingMonitor && this._stopSpeakingMonitor();
+      this._stopQualityMonitor && this._stopQualityMonitor();
+      this._screenShareMinimized = false;
+      this._removeScreenShareIndicator();
+      this._hideMusicPanel();
+    } else {
+      console.warn('[Voice] _updateVoiceButtons(false) skipped stream wipe — media still live');
+    }
+  }
+},
+
+_updateVoiceStatus(inVoice) {
+  const led = document.getElementById('status-voice-led');
+  const text = document.getElementById('status-voice-text');
+  if (!led || !text) return;
+  if (inVoice) {
+    this._setLed('status-voice-led', 'on');
+    text.textContent = t('voice.status_active');
+  } else {
+    this._setLed('status-voice-led', 'off');
+    text.textContent = t('voice.status_off');
+  }
+},
+
+_getVoiceChannelLabel() {
+  if (!this.voice || !this.voice.currentChannel) return '';
+  const ch = this.channels.find(c => c.code === this.voice.currentChannel);
+  if (!ch) return this.voice.currentChannel;
+  if (ch.is_dm && ch.dm_target) return `@ ${this._getNickname(ch.dm_target.id, ch.dm_target.username)}`;
+  return `# ${ch.name}`;
+},
+
+_updateVoiceBar() {
+  const bar = document.getElementById('voice-bar');
+  if (!bar) return;
+  if (this.voice && this.voice.inVoice && this.voice.currentChannel) {
+    const badges = [];
+    if (this.voice.isMuted) badges.push(`<span class="voice-bar-badge">${t('voice.status_muted')}</span>`);
+    if (this.voice.isDeafened) badges.push(`<span class="voice-bar-badge">${t('voice.status_deafened')}</span>`);
+    const channelName = this._getVoiceChannelLabel();
+    bar.innerHTML = `
+      <div class="voice-bar-top">
+        <div class="voice-bar-status">
+          <span class="voice-bar-icon" aria-hidden="true">🔊</span>
+          <div class="voice-bar-status-copy">
+            <span class="voice-bar-status-text">${t('voice.bar_connected')}</span>
+            <span class="voice-bar-channel">${this._escapeHtml(channelName)}</span>
+          </div>
+        </div>
+        <div class="voice-bar-actions">
+          <button class="voice-bar-leave" id="voice-bar-leave-btn" title="${t('voice.disconnect')}">${t('voice.disconnect')}</button>
+          ${badges.length ? `<div class="voice-bar-badges">${badges.join('')}</div>` : ''}
+        </div>
+      </div>
+    `;
+    bar.style.display = 'flex';
+    document.getElementById('voice-bar-leave-btn').addEventListener('click', () => this._leaveVoice());
+  } else {
+    bar.innerHTML = '';
+    bar.style.display = 'none';
+  }
+},
+
+// NS slider is handled directly via the input event listener in _setupUI
+
+// ── Screen Share ──────────────────────────────────────
+
+async _toggleScreenShare() {
+  if (!this.voice.inVoice) return;
+
+  // Spam-click guard, mirroring the one _joinVoice has had for a while.
+  // Without it a double-click (or a laggy UI registering two triggers) ran
+  // shareScreen twice, which fired _createPeer twice within ~120ms and put two
+  // voice-offer SDP negotiations in flight against each other. The resulting
+  // glare shows up as a stalled stream and garbled audio. Reported with
+  // WebRTC-internals evidence by @RCCore. (#5426)
+  if (this._togglingScreenShare) return;
+  this._togglingScreenShare = true;
+  try {
+    await this._doToggleScreenShare();
+  } finally {
+    this._togglingScreenShare = false;
+  }
+},
+
+async _doToggleScreenShare() {
+  // Block screen share if streams are disabled in this channel
+  const _ssCh = this.channels.find(c => c.code === this.voice.currentChannel);
+  if (_ssCh && _ssCh.streams_enabled === 0) {
+    this._showToast(t('voice.streams_disabled'), 'error');
+    return;
+  }
+
+  if (this.voice.isScreenSharing) {
+    await this.voice.stopScreenShare();
+    document.getElementById('screen-share-btn').textContent = '🖥️';
+    document.getElementById('screen-share-btn').title = t('voice.screen_share');
+    document.getElementById('screen-share-btn').classList.remove('sharing');
+    this._showToast(t('voice.screen_share_stopped'), 'info');
+  } else {
+    const ok = await this.voice.shareScreen();
+    if (ok) {
+      document.getElementById('screen-share-btn').textContent = '🛑';
+      document.getElementById('screen-share-btn').title = t('voice.stop_share');
+      document.getElementById('screen-share-btn').classList.add('sharing');
+      // Register a one-time listener for desktop-app share-mode updates so
+      // the audio badge reflects the actual capture path (per-app /
+      // system-clean / fallback / loopback). Browser users won't fire this.
+      if (!this._shareModeListenerInstalled) {
+        this._shareModeListenerInstalled = true;
+        window.addEventListener('haven:share-audio-mode', (ev) => {
+          try { this._applyShareAudioModeBadge(ev.detail); } catch (e) { console.warn('share mode badge update failed:', e); }
+        });
+      }
+      // Show our own screen in the viewer
+      this._handleScreenStream(this.user.id, this.voice.screenStream);
+      // Show audio/no-audio badge
+      if (this.voice.screenHasAudio) {
+        this._handleScreenAudio(this.user.id);
+        this._showToast(t('voice.screen_share_started_audio'), 'success');
+      } else {
+        this._handleScreenNoAudio(this.user.id);
+        this._showToast(t('voice.screen_share_started_no_audio'), 'info');
+      }
+    } else {
+      this._showToast(t('voice.screen_share_cancelled'), 'error');
+    }
+  }
+},
+
+async _toggleWebcam() {
+  if (!this.voice.inVoice) return;
+
+  const btn = document.getElementById('voice-cam-btn');
+  if (this.voice.isWebcamActive) {
+    await this.voice.stopWebcam();
+    btn.textContent = '📷';
+    btn.title = t('voice.panel.camera');
+    btn.classList.remove('sharing');
+    this._handleWebcamStream(this.user.id, null);
+    this._showToast(t('voice.camera_stopped'), 'info');
+  } else {
+    const ok = await this.voice.startWebcam();
+    if (ok) {
+      btn.textContent = '🛑';
+      btn.title = t('voice.stop_camera');
+      btn.classList.add('sharing');
+      this._handleWebcamStream(this.user.id, this.voice.webcamStream);
+      this._showToast(t('voice.camera_started'), 'success');
+    } else {
+      this._showToast(t('voice.camera_error'), 'error');
+    }
+  }
+},
+
+_handleWebcamStream(userId, stream) {
+  const container = document.getElementById('webcam-container');
+  const grid = document.getElementById('webcam-grid');
+  const label = document.getElementById('webcam-label');
+
+  if (stream) {
+    const tileId = `webcam-tile-${userId || 'self'}`;
+    let tile = document.getElementById(tileId);
+    if (!tile) {
+      tile = document.createElement('div');
+      tile.id = tileId;
+      tile.className = 'webcam-tile';
+      tile.setAttribute('role', 'group');
+
+      const vid = document.createElement('video');
+      vid.autoplay = true;
+      vid.playsInline = true;
+      vid.muted = (userId === this.user.id); // mute own cam to avoid echo
+      // Mirror own camera (like a mirror), but show others normally
+      if (userId === this.user.id) {
+        vid.style.transform = 'scaleX(-1)';
+      }
+      tile.appendChild(vid);
+      // Surface a 'Reconnecting…' overlay when the video stalls (item 10)
+      vid.addEventListener('waiting', () => this._setTileReconnecting(tile, true));
+      vid.addEventListener('stalled', () => this._setTileReconnecting(tile, true));
+      vid.addEventListener('playing', () => this._setTileReconnecting(tile, false));
+      vid.addEventListener('canplay', () => this._setTileReconnecting(tile, false));
+
+      const lbl = document.createElement('div');
+      lbl.className = 'webcam-tile-label';
+      const peer = this.voice.peers.get(userId);
+      const who = (userId === null || userId === this.user.id) ? 'You' : (peer ? peer.username : 'Someone');
+      lbl.textContent = who;
+      tile.setAttribute('aria-label', who + ' camera');
+      tile.appendChild(lbl);
+
+      // Double-click to toggle focus mode (expand tile full-size)
+      tile.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        this._toggleWebcamFocus(tile);
+      });
+
+      // Pop-out button (PiP)
+      const popoutBtn = document.createElement('button');
+      popoutBtn.className = 'stream-popout-btn';
+      popoutBtn.title = t('media.pop_out_camera');
+      popoutBtn.textContent = '⧉';
+      popoutBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._popOutWebcam(tile, userId);
+      });
+      tile.appendChild(popoutBtn);
+
+      // Pin / spotlight button — make this camera the big view, others small
+      const pinBtn = document.createElement('button');
+      pinBtn.className = 'stream-pin-btn';
+      pinBtn.setAttribute('aria-pressed', 'false');
+      pinBtn.title = t('media.pin_camera');
+      pinBtn.textContent = '\ud83d\udccc';
+      pinBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._toggleWebcamPin(tile);
+      });
+      tile.appendChild(pinBtn);
+
+      // Fullscreen button
+      const fsBtnWC = document.createElement('button');
+      fsBtnWC.className = 'stream-fullscreen-btn';
+      fsBtnWC.title = t('media.fullscreen');
+      fsBtnWC.textContent = '⛶';
+      fsBtnWC.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const vid = tile.querySelector('video');
+        const target = vid || tile;
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        } else {
+          (target.requestFullscreen || target.webkitRequestFullscreen).call(target).catch(() => {});
+        }
+      });
+      tile.appendChild(fsBtnWC);
+
+      // Minimize button — collapses tile but keeps in grid
+      const minBtn = document.createElement('button');
+      minBtn.className = 'stream-minimize-btn';
+      minBtn.title = t('media.minimize');
+      minBtn.textContent = '─';
+      minBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        tile.classList.toggle('webcam-minimized');
+        const vidEl = tile.querySelector('video');
+        if (tile.classList.contains('webcam-minimized')) {
+          vidEl.style.display = 'none';
+          tile.style.height = '28px';
+          tile.style.minHeight = '0';
+        } else {
+          vidEl.style.display = '';
+          tile.style.height = '';
+          tile.style.minHeight = '';
+        }
+      });
+      tile.appendChild(minBtn);
+
+      // Close button — removes tile entirely
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'stream-close-btn';
+      closeBtn.title = t('media.close_camera');
+      closeBtn.textContent = '✕';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const vidEl = tile.querySelector('video');
+        if (vidEl) vidEl.srcObject = null;
+        tile.remove();
+        this._updateWebcamVisibility();
+
+        // If this is our own camera tile, stop the actual stream and reset
+        // the camera button state so it doesn't still appear active.
+        if (userId === this.user.id) {
+          this.voice.stopWebcam();
+          const btn = document.getElementById('webcam-toggle');
+          if (btn) {
+            btn.textContent = '📷';
+            btn.title = t('voice.panel.camera');
+            btn.classList.remove('sharing');
+          }
+        }
+      });
+      tile.appendChild(closeBtn);
+
+      grid.appendChild(tile);
+    }
+
+    container.style.display = 'flex';
+
+    const videoEl = tile.querySelector('video');
+    if (videoEl.srcObject === stream) videoEl.srcObject = null;
+    videoEl.srcObject = stream;
+    videoEl.play().catch(() => {});
+    videoEl.onloadedmetadata = () => { videoEl.play().catch(() => {}); };
+
+    // Accessibility: mirror each control's title into an aria-label (item 9)
+    tile.querySelectorAll('button[title]').forEach((b) => { if (!b.getAttribute('aria-label')) b.setAttribute('aria-label', b.title); });
+
+    // Retry playback for late-arriving tracks
+    let _retries = 0;
+    const _retryPlay = () => {
+      if (!videoEl.srcObject || _retries > 15) return;
+      if (videoEl.videoWidth === 0) {
+        _retries++;
+        if (_retries % 5 === 0) {
+          const s = videoEl.srcObject;
+          videoEl.srcObject = null;
+          videoEl.srcObject = s;
+        }
+        videoEl.play().catch(() => {});
+        setTimeout(_retryPlay, 500);
+      }
+    };
+    setTimeout(_retryPlay, 600);
+
+    // Apply saved webcam size
+    const savedSize = localStorage.getItem('haven_webcam_size');
+    if (savedSize) {
+      const vh = parseInt(savedSize, 10);
+      container.style.maxHeight = vh + 'vh';
+      grid.style.maxHeight = (vh - 2) + 'vh';
+      const tileMaxW = Math.max(vh * 1.33, 15);
+      document.querySelectorAll('.webcam-tile').forEach(t => { t.style.maxWidth = tileMaxW + 'vw'; });
+      document.querySelectorAll('.webcam-tile video').forEach(v => { v.style.maxHeight = (vh - 4) + 'vh'; });
+    }
+
+    this._updateWebcamVisibility();
+    this._ensureSpeakingMonitor();
+    this._syncWebcamTiles();
+    this._startQualityMonitor();
+  } else {
+    // Stream ended — remove tile
+    const tileId = `webcam-tile-${userId || 'self'}`;
+    const tile = document.getElementById(tileId);
+    if (tile) {
+      const vid = tile.querySelector('video');
+      if (vid) vid.srcObject = null;
+      tile.remove();
+    }
+    // Reset own button if our cam ended externally
+    if (userId === this.user.id || userId === 'self') {
+      const btn = document.getElementById('voice-cam-btn');
+      if (btn) {
+        btn.textContent = '📷';
+        btn.title = t('voice.panel.camera');
+        btn.classList.remove('sharing');
+      }
+    }
+    // Close any PiP overlay for this user
+    const pipEl = document.getElementById(`webcam-pip-${userId || 'self'}`);
+    if (pipEl) pipEl.remove();
+
+    this._updateWebcamVisibility();
+    this._syncWebcamTiles();
+  }
+},
+
+_updateWebcamVisibility() {
+  const container = document.getElementById('webcam-container');
+  const grid = document.getElementById('webcam-grid');
+  const label = document.getElementById('webcam-label');
+  const count = grid.querySelectorAll('.webcam-tile:not(.webcam-presence)').length;
+  if (count === 0) {
+    container.style.display = 'none';
+    container.classList.remove('webcam-focus-mode');
+    this._removeWebcamIndicator();
+  } else {
+    label.textContent = `📷 ${count} camera${count !== 1 ? 's' : ''}`;
+  }
+},
+
+_showWebcamIndicator(count) {
+  let ind = document.getElementById('webcam-indicator');
+  if (!ind) {
+    ind = document.createElement('button');
+    ind.id = 'webcam-indicator';
+    ind.className = 'screen-share-indicator'; // reuse same styling
+    ind.addEventListener('click', () => {
+      const container = document.getElementById('webcam-container');
+      if (container) {
+        container.style.display = 'flex';
+        // Exit focus mode if it was active
+        container.classList.remove('webcam-focus-mode');
+        const grid = document.getElementById('webcam-grid');
+        if (grid) grid.querySelectorAll('.webcam-tile').forEach(t => t.classList.remove('webcam-focused'));
+        // Re-apply saved size
+        const saved = localStorage.getItem('haven_webcam_size') || '25';
+        const vh = parseInt(saved, 10);
+        container.style.maxHeight = vh + 'vh';
+        grid.style.maxHeight = (vh - 2) + 'vh';
+        const tileMaxW = Math.max(vh * 1.33, 15);
+        document.querySelectorAll('.webcam-tile').forEach(t => { t.style.maxWidth = tileMaxW + 'vw'; });
+        document.querySelectorAll('.webcam-tile video').forEach(v => { v.style.maxHeight = (vh - 4) + 'vh'; });
+      }
+      ind.remove();
+    });
+    document.querySelector('.channel-header')?.appendChild(ind);
+  }
+  ind.textContent = `📷 ${count} camera${count > 1 ? 's' : ''} hidden`;
+},
+
+_removeWebcamIndicator() {
+  document.getElementById('webcam-indicator')?.remove();
+},
+
+_closeWebcam() {
+  // If user is actively sharing their webcam, stop it
+  if (this.voice && this.voice.isWebcamActive) {
+    this._toggleWebcam();
+  }
+  const container = document.getElementById('webcam-container');
+  const grid = document.getElementById('webcam-grid');
+  // Remove all tiles
+  if (grid) {
+    grid.querySelectorAll('.webcam-tile').forEach(t => {
+      const vid = t.querySelector('video');
+      if (vid) vid.srcObject = null;
+      t.remove();
+    });
+  }
+  // Remove any PiP overlays
+  document.querySelectorAll('.webcam-pip-overlay').forEach(p => p.remove());
+  container.style.display = 'none';
+  container.classList.remove('webcam-focus-mode');
+  this._removeWebcamIndicator();
+},
+
+_toggleWebcamFocus(tile) {
+  const container = document.getElementById('webcam-container');
+  const grid = document.getElementById('webcam-grid');
+  const wasFocused = tile.classList.contains('webcam-focused');
+
+  // Don't allow focus on minimized tiles
+  if (tile.classList.contains('webcam-minimized')) return;
+
+  // Remove focus from all tiles first
+  grid.querySelectorAll('.webcam-tile').forEach(t => t.classList.remove('webcam-focused'));
+  container.classList.remove('webcam-focus-mode');
+
+  if (!wasFocused) {
+    tile.classList.add('webcam-focused');
+    container.classList.add('webcam-focus-mode');
+    // Clear ALL inline size constraints so pure CSS focus mode takes over
+    container.style.maxHeight = '';
+    container.style.minHeight = '';
+    grid.style.maxHeight = '';
+    tile.style.maxWidth = '';
+    const vid = tile.querySelector('video');
+    if (vid) vid.style.maxHeight = '';
+  } else {
+    // Restore slider-based size
+    const saved = localStorage.getItem('haven_webcam_size') || '25';
+    const vh = parseInt(saved, 10);
+    container.style.maxHeight = vh + 'vh';
+    grid.style.maxHeight = (vh - 2) + 'vh';
+    const tileMaxW = Math.max(vh * 1.33, 15);
+    document.querySelectorAll('.webcam-tile').forEach(t => { t.style.maxWidth = tileMaxW + 'vw'; });
+    document.querySelectorAll('.webcam-tile video').forEach(v => { v.style.maxHeight = (vh - 4) + 'vh'; });
+  }
+},
+
+_popOutWebcam(tile, userId) {
+  const video = tile.querySelector('video');
+  if (!video || !video.srcObject) return;
+
+  // If already in PiP, exit it
+  if (document.pictureInPictureElement === video) {
+    document.exitPictureInPicture().catch(() => {});
+    return;
+  }
+
+  if (tile.classList.contains('webcam-popped-out')) return;
+
+  // Try native Picture-in-Picture first
+  if (document.pictureInPictureEnabled && !video.disablePictureInPicture) {
+    video.requestPictureInPicture().then(() => {
+      const popoutBtn = tile.querySelector('.stream-popout-btn');
+      if (popoutBtn) { popoutBtn.textContent = '⧈'; popoutBtn.title = t('media.pop_in_camera'); }
+      tile.classList.add('webcam-popped-out');
+
+      video.addEventListener('leavepictureinpicture', () => {
+        if (popoutBtn) { popoutBtn.textContent = '⧉'; popoutBtn.title = t('media.pop_out_camera'); }
+        tile.classList.remove('webcam-popped-out');
+      }, { once: true });
+    }).catch(() => {
+      this._popOutWebcamOverlay(tile, userId);
+    });
+  } else {
+    this._popOutWebcamOverlay(tile, userId);
+  }
+},
+
+_popOutWebcamOverlay(tile, userId) {
+  const video = tile.querySelector('video');
+  if (!video || !video.srcObject) return;
+
+  const stream = video.srcObject;
+  const peer = this.voice.peers.get(userId);
+  const who = userId === null || userId === this.user.id ? 'You' : (peer ? peer.username : 'Camera');
+
+  const pipId = `webcam-pip-${userId || 'self'}`;
+  if (document.getElementById(pipId)) return;
+
+  const savedOpacity = parseInt(localStorage.getItem('haven_pip_opacity') ?? '100');
+  const pip = document.createElement('div');
+  pip.id = pipId;
+  pip.className = 'music-pip-overlay webcam-pip-overlay';
+  pip.style.opacity = savedOpacity / 100;
+
+  pip.innerHTML = `
+    <div class="music-pip-embed stream-pip-video"></div>
+    <div class="music-pip-controls">
+      <button class="music-pip-btn stream-pip-popin" title="${t('media.pop_back_in')}">⧈</button>
+      <span class="music-pip-label">📷 ${who}</span>
+      <span class="music-pip-vol-icon" title="Window opacity">👁</span>
+      <input type="range" class="music-pip-vol pip-opacity-slider" min="20" max="100" value="${savedOpacity}">
+      <button class="music-pip-btn stream-pip-fullscreen" title="${t('media.fullscreen')}">⤢</button>
+      <button class="music-pip-btn stream-pip-close" title="Close">✕</button>
+    </div>
+  `;
+
+  document.body.appendChild(pip);
+
+  const pipVideo = document.createElement('video');
+  pipVideo.autoplay = true;
+  pipVideo.playsInline = true;
+  pipVideo.muted = true;
+  pipVideo.srcObject = stream;
+  const mirrorCss = (userId === this.user.id) ? 'transform:scaleX(-1);' : '';
+  pipVideo.style.cssText = `width:100%;height:100%;object-fit:cover;display:block;${mirrorCss}`;
+  pip.querySelector('.stream-pip-video').appendChild(pipVideo);
+  pipVideo.play().catch(() => {});
+
+  const popoutBtn = tile.querySelector('.stream-popout-btn');
+  if (popoutBtn) { popoutBtn.textContent = '⧈'; popoutBtn.title = t('media.pop_in_camera'); }
+  tile.classList.add('webcam-popped-out');
+
+  const popIn = () => {
+    pip.remove();
+    if (popoutBtn) { popoutBtn.textContent = '⧉'; popoutBtn.title = t('media.pop_out_camera'); }
+    tile.classList.remove('webcam-popped-out');
+  };
+
+  const closePip = () => {
+    pip.remove();
+    if (popoutBtn) { popoutBtn.textContent = '⧉'; popoutBtn.title = t('media.pop_out_camera'); }
+    tile.classList.remove('webcam-popped-out');
+  };
+
+  pip.querySelector('.stream-pip-popin').addEventListener('click', popIn);
+  pip.querySelector('.stream-pip-close').addEventListener('click', closePip);
+  pip.querySelector('.stream-pip-fullscreen').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const vid = pip.querySelector('video');
+    const target = vid || pip;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      (target.requestFullscreen || target.webkitRequestFullscreen).call(target).catch(() => {});
+    }
+  });
+
+  pip.querySelector('.pip-opacity-slider').addEventListener('input', (e) => {
+    const val = parseInt(e.target.value);
+    pip.style.opacity = val / 100;
+    localStorage.setItem('haven_pip_opacity', val);
+  });
+
+  this._initPipDrag(pip, pip);
+
+  const streamTrack = stream.getVideoTracks()[0];
+  if (streamTrack) {
+    const prevOnEnded = streamTrack.onended;
+    streamTrack.onended = () => {
+      if (prevOnEnded) prevOnEnded();
+      popIn();
+    };
+  }
+},
+
+_handleScreenStream(userId, stream, { force = false } = {}) {
+  const container = document.getElementById('screen-share-container');
+  const grid = document.getElementById('screen-share-grid');
+  const label = document.getElementById('screen-share-label');
+
+  if (stream) {
+    // Honour auto-accept setting — show a join prompt instead of opening the tile automatically
+    const autoAccept = force || localStorage.getItem('haven_auto_accept_streams') !== 'false';
+    if (!autoAccept && userId !== null && userId !== this.user.id) {
+      const peer = this.voice.peers.get(userId);
+      const who = peer ? peer.username : 'Someone';
+      this._showToast(t('voice.sharing_started', { who: this._escapeHtml(who) }), 'info', {
+        label: 'Join',
+        onClick: () => this._handleScreenStream(userId, stream, { force: true })
+      }, 8000);
+      return;
+    }
+
+    // Create a tile for this user's stream
+    const tileId = `screen-tile-${userId || 'self'}`;
+    let tile = document.getElementById(tileId);
+    if (!tile) {
+      tile = document.createElement('div');
+      tile.id = tileId;
+      tile.className = 'screen-share-tile';
+
+      const vid = document.createElement('video');
+      vid.autoplay = true;
+      vid.playsInline = true;
+      vid.muted = true; // Always mute — screen audio routes through WebRTC audio track
+      tile.appendChild(vid);
+
+      const lbl = document.createElement('div');
+      lbl.className = 'screen-share-tile-label';
+      const peer = this.voice.peers.get(userId);
+      const who = userId === null || userId === this.user.id ? 'You' : (peer ? peer.username : 'Someone');
+      lbl.textContent = who;
+      tile.appendChild(lbl);
+
+      // Audio controls overlay (volume + mute for stream audio)
+      const controls = document.createElement('div');
+      controls.className = 'stream-audio-controls';
+      controls.id = `stream-controls-${userId || 'self'}`;
+
+      const muteBtn = document.createElement('button');
+      muteBtn.className = 'stream-mute-btn';
+      muteBtn.title = t('media.stream_mute');
+      muteBtn.textContent = '🔊';
+      muteBtn.dataset.muted = 'false';
+
+      const volSlider = document.createElement('input');
+      volSlider.type = 'range';
+      volSlider.className = 'stream-vol-slider';
+      volSlider.min = '0';
+      volSlider.max = '200';
+      volSlider.title = t('media.stream_volume');
+
+      const volPct = document.createElement('span');
+      volPct.className = 'stream-vol-pct';
+
+      // Restore saved volume
+      try {
+        const savedVols = JSON.parse(localStorage.getItem('haven_stream_volumes') || '{}');
+        const sv = savedVols[userId] ?? 100;
+        volSlider.value = String(sv);
+        volPct.textContent = sv + '%';
+      } catch { volSlider.value = '100'; volPct.textContent = '100%'; }
+
+      muteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isMuted = muteBtn.dataset.muted === 'true';
+        if (isMuted) {
+          const vol = parseFloat(volSlider.value) / 100;
+          this.voice.setStreamVolume(userId, vol);
+          muteBtn.textContent = '🔊';
+          muteBtn.dataset.muted = 'false';
+          muteBtn.classList.remove('muted');
+        } else {
+          this.voice.setStreamVolume(userId, 0);
+          muteBtn.textContent = '🔇';
+          muteBtn.dataset.muted = 'true';
+          muteBtn.classList.add('muted');
+        }
+      });
+
+      volSlider.addEventListener('input', (e) => {
+        e.stopPropagation();
+        const val = parseInt(volSlider.value);
+        this.voice.setStreamVolume(userId, val / 100);
+        volPct.textContent = val + '%';
+        muteBtn.textContent = val === 0 ? '🔇' : '🔊';
+        muteBtn.dataset.muted = val === 0 ? 'true' : 'false';
+        muteBtn.classList.toggle('muted', val === 0);
+        try {
+          const vols = JSON.parse(localStorage.getItem('haven_stream_volumes') || '{}');
+          vols[userId] = val;
+          localStorage.setItem('haven_stream_volumes', JSON.stringify(vols));
+        } catch {}
+      });
+
+      controls.appendChild(muteBtn);
+      controls.appendChild(volSlider);
+      controls.appendChild(volPct);
+      tile.appendChild(controls);
+
+      // Double-click to toggle focus mode (expand tile to fill chat area)
+      tile.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        this._toggleStreamFocus(tile);
+      });
+
+      // Pop-out button
+      const popoutBtn = document.createElement('button');
+      popoutBtn.className = 'stream-popout-btn';
+      popoutBtn.title = t('media.pop_out_stream');
+      popoutBtn.textContent = '⧉';
+      popoutBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._popOutStream(tile, userId);
+      });
+      tile.appendChild(popoutBtn);
+
+      // Fullscreen button — makes the video element fill the screen
+      const fsBtn = document.createElement('button');
+      fsBtn.className = 'stream-fullscreen-btn';
+      fsBtn.title = t('media.fullscreen');
+      fsBtn.textContent = '⛶';
+      fsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const vid = tile.querySelector('video');
+        const target = vid || tile;
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(() => {});
+        } else {
+          (target.requestFullscreen || target.webkitRequestFullscreen).call(target).catch(() => {});
+        }
+      });
+      tile.appendChild(fsBtn);
+
+      // Minimize button — hides tile but KEEPS audio playing
+      const minBtn = document.createElement('button');
+      minBtn.className = 'stream-minimize-btn';
+      minBtn.title = t('media.stream_minimize');
+      minBtn.textContent = '─';
+      minBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._hideStreamTile(tile, userId, who, false);
+      });
+      tile.appendChild(minBtn);
+
+      // Close button — hides tile and mutes its audio (can be restored from hidden bar)
+      const closeBtn = document.createElement('button');
+      closeBtn.className = 'stream-close-btn';
+      closeBtn.title = t('media.stream_close');
+      closeBtn.textContent = '✕';
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._hideStreamTile(tile, userId, who, true);
+      });
+      tile.appendChild(closeBtn);
+
+      grid.appendChild(tile);
+    }
+
+    // Show the container BEFORE assigning srcObject — browsers won't decode
+    // video frames inside a display:none container, causing a black rectangle
+    // that only fixes itself on layout reflow (e.g. resizing the slider).
+    container.style.display = 'flex';
+
+    const videoEl = tile.querySelector('video');
+    // Force a layout reflow so the video element has real dimensions
+    void videoEl.offsetHeight;
+    // Skip srcObject reassignment if the existing stream already wraps the
+    // same live video track AND we're already getting frames. WebRTC fires
+    // track.onunmute on every transient packet-loss / bitrate-adapt blip;
+    // each fire calls back into here with `new MediaStream([sameTrack])`.
+    // Reassigning srcObject in those moments kicks the browser out of
+    // fullscreen (and pop-out, on some platforms) because the fullscreen
+    // element's underlying media briefly "changes". Only swap if the track
+    // is actually different or we don't have frames yet.
+    const newVideoTrack = stream.getVideoTracks()[0] || null;
+    const curStream = videoEl.srcObject;
+    const curVideoTrack = curStream ? (curStream.getVideoTracks?.()[0] || null) : null;
+    // If the currently attached track is dead (readyState !== 'live'), we MUST
+    // reassign — even if the new track has the same id, the browser will keep
+    // rendering a black frame from the dead source. This happens on reshare
+    // when the sharer's stopScreenShare ends the track but the viewer's
+    // element still holds a reference to that dead MediaStreamTrack.
+    const curTrackIsDead = !!curVideoTrack && curVideoTrack.readyState !== 'live';
+    const sameLiveTrack = !curTrackIsDead &&
+      newVideoTrack && curVideoTrack &&
+      newVideoTrack.id === curVideoTrack.id &&
+      newVideoTrack.readyState === 'live' &&
+      videoEl.videoWidth > 0;
+    if (!sameLiveTrack) {
+      // Force re-render if the same stream is re-assigned (otherwise it's a no-op → black screen)
+      if (videoEl.srcObject === stream) {
+        videoEl.srcObject = null;
+      }
+      videoEl.srcObject = stream;
+    }
+    videoEl.play().catch(() => {});
+    // Also re-play when metadata loads (handles late-arriving tracks)
+    videoEl.onloadedmetadata = () => { videoEl.play().catch(() => {}); };
+
+    // WebRTC video tracks often arrive muted (no frames yet). Retry playback
+    // until the video actually has dimensions, which means frames are flowing.
+    let _retries = 0;
+    let _renegotiateRequested = false;
+    const _retryPlay = () => {
+      if (!videoEl.srcObject || _retries > 20) return;
+      if (videoEl.videoWidth === 0) {
+        _retries++;
+        // Re-trigger srcObject assignment to prod the decoder
+        if (_retries % 5 === 0) {
+          const s = videoEl.srcObject;
+          videoEl.srcObject = null;
+          videoEl.srcObject = s;
+        }
+        // After ~3s of no frames, ask the sharer to re-issue the offer.
+        // A hung renegotiation on the sharer side, an ICE restart that
+        // didn't carry video, or simply a dropped voice-offer all leave
+        // the receiver with audio-but-no-video. Asking for a renegotiate
+        // is the only way to recover without a full leave/rejoin.
+        // (#5347 v3.15.5)
+        if (!_renegotiateRequested && _retries >= 6 &&
+            this.voice && this.voice.inVoice && userId && userId !== this.user.id) {
+          _renegotiateRequested = true;
+          this.socket.emit('request-screen-renegotiate', {
+            code: this.voice.currentChannel,
+            sharerId: userId
+          });
+        }
+        videoEl.play().catch(() => {});
+        setTimeout(_retryPlay, 500);
+      }
+    };
+    setTimeout(_retryPlay, 600);
+    this._startStreamStallWatchdog(tileId, userId);
+    this._screenShareMinimized = false;
+    this._removeScreenShareIndicator();
+    // Apply saved stream size so it doesn't start at default/cut-off height
+    const savedStreamSize = localStorage.getItem('haven_stream_size');
+    if (savedStreamSize) {
+      const vh = parseInt(savedStreamSize, 10);
+      container.style.maxHeight = vh + 'vh';
+      grid.style.maxHeight = (vh - 2) + 'vh';
+      document.querySelectorAll('.screen-share-tile video').forEach(v => { v.style.maxHeight = (vh - 4) + 'vh'; });
+    }
+    // Update label accounting for hidden tiles, and refresh hidden streams bar
+    this._updateHiddenStreamsBar();
+    this._updateScreenShareVisibility();
+    // Notify server we're watching this stream
+    if (this.voice && this.voice.inVoice && userId && userId !== this.user.id) {
+      this.socket.emit('stream-watch', { code: this.voice.currentChannel, sharerId: userId });
+    }
+  } else {
+    // Stream ended — remove this tile
+    const tileId = `screen-tile-${userId || 'self'}`;
+    this._stopStreamStallWatchdog(tileId);
+    const tile = document.getElementById(tileId);
+    if (tile) {
+      const vid = tile.querySelector('video');
+      if (vid) vid.srcObject = null;
+      tile.remove();
+    }
+    // If our OWN stream ended (e.g. browser "Stop sharing" button),
+    // reset the screen-share button so it doesn't stay in "stop" state
+    if (userId === this.user.id || userId === 'self') {
+      const ssBtn = document.getElementById('screen-share-btn');
+      if (ssBtn) {
+        ssBtn.textContent = '🖥️';
+        ssBtn.title = t('voice.screen_share');
+        ssBtn.classList.remove('sharing');
+      }
+    }
+    // Notify server we stopped watching
+    if (this.voice && this.voice.inVoice && userId && userId !== this.user.id) {
+      this.socket.emit('stream-unwatch', { code: this.voice.currentChannel, sharerId: userId });
+    }
+    this._updateHiddenStreamsBar();
+    this._updateScreenShareVisibility();
+  }
+},
+
+// ── Stream Frame-Progress Watchdog ───────────────────────
+//
+// `videoWidth > 0` only proves that metadata arrived once. On a reshare the
+// element keeps the dimensions of the stream it was previously showing, so a
+// tile can sit on a frozen or black frame indefinitely while videoWidth reads
+// as healthy — and _retryPlay, which bails the moment videoWidth is non-zero,
+// never runs. That is the "black screen until I dragged the resize slider"
+// case: the slider forced a reflow, which nudged the decoder, which is not a
+// recovery path anyone should have to discover.
+//
+// Watch the decoded-frame counter instead. It is the only signal that says
+// frames are actually arriving *now*.
+_startStreamStallWatchdog(tileId, userId) {
+  if (!this._streamStallTimers) this._streamStallTimers = {};
+  this._stopStreamStallWatchdog(tileId);
+
+  const readFrames = (videoEl) => {
+    try {
+      const q = videoEl.getVideoPlaybackQuality && videoEl.getVideoPlaybackQuality();
+      if (q && typeof q.totalVideoFrames === 'number') return q.totalVideoFrames;
+    } catch {}
+    return typeof videoEl.webkitDecodedFrameCount === 'number'
+      ? videoEl.webkitDecodedFrameCount
+      : -1;
+  };
+
+  let lastFrames = -1;
+  let stalls = 0;
+
+  this._streamStallTimers[tileId] = setInterval(() => {
+    const tile = document.getElementById(tileId);
+    const videoEl = tile && tile.querySelector('video');
+    if (!tile || !videoEl || !videoEl.srcObject) {
+      this._stopStreamStallWatchdog(tileId);
+      return;
+    }
+    // A hidden tile or a backgrounded window legitimately stops decoding.
+    // Treating that as a stall would spam the sharer with renegotiate
+    // requests every time someone minimises a stream.
+    if (tile.dataset.hidden === 'true' || document.hidden) { stalls = 0; return; }
+
+    const track = videoEl.srcObject.getVideoTracks
+      ? videoEl.srcObject.getVideoTracks()[0]
+      : null;
+    // Nothing is meant to be flowing — not a stall.
+    if (!track || track.readyState !== 'live' || track.muted) { stalls = 0; return; }
+
+    const frames = readFrames(videoEl);
+    if (frames < 0) { this._stopStreamStallWatchdog(tileId); return; } // unsupported
+
+    if (frames > lastFrames) {
+      lastFrames = frames;
+      stalls = 0;
+      return;
+    }
+
+    stalls++;
+    if (stalls === 2) {
+      // ~3s without a new frame. Re-attach the stream: a fresh srcObject
+      // assignment rebuilds the element's decode pipeline, which is what the
+      // accidental resize was really doing.
+      console.warn('[Stream] No frames for', tileId, '— re-attaching srcObject');
+      const s = videoEl.srcObject;
+      videoEl.srcObject = null;
+      videoEl.srcObject = s;
+      videoEl.play().catch(() => {});
+    } else if (stalls === 4 && userId && userId !== this.user.id &&
+               this.voice && this.voice.inVoice) {
+      // ~6s. Re-attaching didn't help, so the problem is upstream of us.
+      //
+      // The budget below is the fix for the loop @RCCore identified (#5426).
+      // A renegotiation delivers a new stream, which re-arms this watchdog
+      // with stalls back at 0, so the `stalls >= 12` give-up further down was
+      // unreachable: every request reset the counter that was supposed to
+      // stop the requests. On a link that is dropping frames for bandwidth
+      // reasons rather than signalling reasons, each renegotiation interrupts
+      // the buffer and causes the very stall that triggers the next one.
+      //
+      // The budget lives on `this` keyed by sharer, so it survives re-arms,
+      // and it backs off rather than hammering at a fixed interval.
+      if (!this._renegBudget) this._renegBudget = {};
+      const now = Date.now();
+      const b = this._renegBudget[userId] || { count: 0, nextAllowed: 0, windowStart: now };
+      if (now - b.windowStart > 120000) { b.count = 0; b.windowStart = now; }
+
+      if (b.count >= 3) {
+        console.warn('[Stream] Renegotiate budget spent for', userId,
+          '— not asking again this window. The stream is likely bandwidth-starved, not stuck.');
+      } else if (now < b.nextAllowed) {
+        // Backing off; say nothing and let the next tick reconsider.
+      } else {
+        b.count++;
+        b.nextAllowed = now + (5000 * b.count);   // 5s, 10s, 15s
+        this._renegBudget[userId] = b;
+        console.warn('[Stream] Still no frames for', tileId, '— requesting renegotiate',
+          `(${b.count}/3 this window)`);
+        this.socket.emit('request-screen-renegotiate', {
+          code: this.voice.currentChannel,
+          sharerId: userId
+        });
+      }
+      this._renegBudget[userId] = b;
+    } else if (stalls >= 12) {
+      // ~18s of nothing after both recovery attempts. Stop burning a timer;
+      // a fresh share or rejoin will re-arm this.
+      console.warn('[Stream] Giving up frame watchdog for', tileId);
+      this._stopStreamStallWatchdog(tileId);
+    }
+  }, 1500);
+},
+
+_stopStreamStallWatchdog(tileId) {
+  if (this._streamStallTimers && this._streamStallTimers[tileId]) {
+    clearInterval(this._streamStallTimers[tileId]);
+    delete this._streamStallTimers[tileId];
+  }
+},
+
+// ── Audio Device Enumeration ─────────────────────────────
+
+async _populateAudioDevices() {
+  const inputSelect  = document.getElementById('voice-input-device');
+  const outputSelect = document.getElementById('voice-output-device');
+  const camSelect    = document.getElementById('voice-cam-device');
+  if (!inputSelect || !outputSelect) return;
+
+  let devices = [];
+  try {
+    // Request a temp stream to ensure device labels are populated (browsers
+    // hide labels until permission is granted at least once).
+    let tempStream = null;
+    const testDevices = await navigator.mediaDevices.enumerateDevices();
+    const hasLabels = testDevices.some(d => d.label);
+    if (!hasLabels) {
+      try {
+        tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {}
+    }
+    devices = await navigator.mediaDevices.enumerateDevices();
+    if (tempStream) tempStream.getTracks().forEach(t => t.stop());
+  } catch (err) {
+    console.warn('[MSG Arena] Could not enumerate audio devices:', err);
+    return;
+  }
+
+  const inputs  = devices.filter(d => d.kind === 'audioinput');
+  const outputs = devices.filter(d => d.kind === 'audiooutput');
+  const cameras = devices.filter(d => d.kind === 'videoinput');
+
+  const savedInput  = localStorage.getItem('haven_input_device') || '';
+  const savedOutput = localStorage.getItem('haven_output_device') || '';
+  const savedCam    = localStorage.getItem('haven_cam_device') || '';
+
+  // Populate input
+  inputSelect.innerHTML = `<option value="">${t('voice_settings.default_mic')}</option>`;
+  for (const dev of inputs) {
+    const label = dev.label || t('voice_settings.mic_fallback', { n: inputs.indexOf(dev) + 1 });
+    const opt = document.createElement('option');
+    opt.value = dev.deviceId;
+    opt.textContent = label;
+    if (savedInput === dev.deviceId) opt.selected = true;
+    inputSelect.appendChild(opt);
+  }
+
+  // Populate output
+  outputSelect.innerHTML = `<option value="">${t('voice_settings.default_speaker')}</option>`;
+  for (const dev of outputs) {
+    const label = dev.label || t('voice_settings.speaker_fallback', { n: outputs.indexOf(dev) + 1 });
+    const opt = document.createElement('option');
+    opt.value = dev.deviceId;
+    opt.textContent = label;
+    if (savedOutput === dev.deviceId) opt.selected = true;
+    outputSelect.appendChild(opt);
+  }
+
+  // Browsers that don't implement HTMLMediaElement.setSinkId (notably
+  // Firefox) can't switch audio output devices in JS. Disable the picker
+  // and surface a hint so users aren't left confused. (#5295)
+  const _supportsSinkId = typeof HTMLAudioElement !== 'undefined'
+    && typeof HTMLAudioElement.prototype.setSinkId === 'function';
+  if (!_supportsSinkId) {
+    outputSelect.disabled = true;
+    outputSelect.title = 'Your browser does not support switching audio output devices. Pick the output in your OS sound settings.';
+    const _hintId = 'voice-output-unsupported-hint';
+    if (!document.getElementById(_hintId) && outputSelect.parentElement) {
+      const hint = document.createElement('small');
+      hint.id = _hintId;
+      hint.className = 'settings-hint';
+      hint.style.cssText = 'display:block;margin-top:4px;opacity:0.85';
+      hint.textContent = 'Your browser can\u2019t switch audio output devices. Use your OS sound settings instead.';
+      outputSelect.parentElement.appendChild(hint);
+    }
+  }
+
+  // Populate camera
+  if (camSelect) {
+    camSelect.innerHTML = `<option value="">${t('voice_settings.default_camera')}</option>`;
+    for (const dev of cameras) {
+      const label = dev.label || t('voice_settings.camera_fallback', { n: cameras.indexOf(dev) + 1 });
+      const opt = document.createElement('option');
+      opt.value = dev.deviceId;
+      opt.textContent = label;
+      if (savedCam === dev.deviceId) opt.selected = true;
+      camSelect.appendChild(opt);
+    }
+  }
+},
+
+// ── Mic Level Meter ──────────────────────────────────────
+
+// (#5456) This used to start a requestAnimationFrame loop at app startup and
+// never stop it, so every client ran a frame loop for its entire session even
+// though the meter lives inside the settings modal and is off screen almost
+// all of the time. A permanently scheduled rAF keeps the renderer asking the
+// compositor for a new frame on every vsync, which is why an audio-only call
+// could sit there burning CPU on Rendering/Painting and keeping the GPU busy
+// with nothing on screen that moves. Now the loop only runs while the meter is
+// actually visible, and it only touches the DOM when the value really changed.
+_startMicMeter() {
+  const fill = this._micMeterFill;
+  if (!fill) return;
+
+  if (typeof IntersectionObserver === 'function') {
+    if (this._micMeterObserver) return;
+    this._micMeterObserver = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) this._runMicMeter();
+      else this._stopMicMeter();
+    });
+    this._micMeterObserver.observe(fill);
+    return;
+  }
+  this._runMicMeter();
+},
+
+_runMicMeter() {
+  if (this._micMeterRAF) return;
+  const fill = this._micMeterFill;
+  if (!fill) return;
+
+  let lastWidth = null;
+  const tick = () => {
+    const level = (this.voice && this.voice.inVoice) ? this.voice.currentMicLevel : 0;
+    // Whole percents only — the bar is a few hundred pixels wide, so finer
+    // steps cost a layout + paint per frame and change nothing visually.
+    const width = Math.round(level) + '%';
+    if (width !== lastWidth) {
+      fill.style.width = width;
+      lastWidth = width;
+    }
+    this._micMeterRAF = requestAnimationFrame(tick);
+  };
+  this._micMeterRAF = requestAnimationFrame(tick);
+},
+
+_stopMicMeter() {
+  if (this._micMeterRAF) {
+    cancelAnimationFrame(this._micMeterRAF);
+    this._micMeterRAF = null;
+  }
+  if (this._micMeterFill) this._micMeterFill.style.width = '0%';
+},
+
+_updateMicMeterThreshold(sensitivity) {
+  // Map sensitivity 0-100 to threshold position
+  // Same mapping as voice.js: threshold = 2 + (sensitivity/100)*38 → range 2-40
+  // Meter is 0-100 which maps to avg 0-50, so threshold of N → (N/50)*100 percent
+  if (!this._micMeterThreshold) return;
+  if (sensitivity === 0) {
+    this._micMeterThreshold.style.display = 'none';
+    return;
+  }
+  const threshold = 2 + (sensitivity / 100) * 38;
+  const percent = (threshold / 50) * 100;
+  this._micMeterThreshold.style.display = '';
+  this._micMeterThreshold.style.left = percent + '%';
+},
+
+_applyStreamLayout(mode) {
+  const grid = document.getElementById('screen-share-grid');
+  if (!grid) return;
+  grid.classList.remove('layout-vertical', 'layout-side-by-side', 'layout-grid-2x2');
+  if (mode === 'vertical') grid.classList.add('layout-vertical');
+  else if (mode === 'side-by-side') grid.classList.add('layout-side-by-side');
+  else if (mode === 'grid-2x2') grid.classList.add('layout-grid-2x2');
+  // 'auto' = no extra class, default CSS applies
+},
+
+_applyWebcamLayout(mode) {
+  const grid = document.getElementById('webcam-grid');
+  if (!grid) return;
+  const container = document.getElementById('webcam-container');
+  grid.classList.remove('layout-vertical', 'layout-side-by-side', 'layout-grid-2x2', 'layout-gallery');
+  if (container) container.classList.toggle('webcam-gallery-mode', mode === 'gallery');
+  if (mode === 'vertical') grid.classList.add('layout-vertical');
+  else if (mode === 'side-by-side') grid.classList.add('layout-side-by-side');
+  else if (mode === 'grid-2x2') grid.classList.add('layout-grid-2x2');
+  else if (mode === 'gallery') grid.classList.add('layout-gallery');
+  if (this._syncWebcamTiles) this._syncWebcamTiles();
+},
+
+_updateScreenShareVisibility() {
+  const container = document.getElementById('screen-share-container');
+  const grid = document.getElementById('screen-share-grid');
+  const label = document.getElementById('screen-share-label');
+  const totalCount = grid.children.length;
+  const visibleCount = grid.querySelectorAll('.screen-share-tile:not([data-hidden=\"true\"])').length;
+  const hiddenCount = totalCount - visibleCount;
+  if (totalCount === 0) {
+    container.style.display = 'none';
+    this._screenShareMinimized = false;
+    this._removeScreenShareIndicator();
+    // Clean up hidden streams bar
+    document.getElementById('hidden-streams-bar')?.remove();
+  } else if (visibleCount === 0) {
+    // All tiles hidden — collapse the container to avoid empty gray space,
+    // but keep the "hidden streams" bar in the header so user can restore.
+    container.style.display = 'none';
+  } else if (this._screenShareMinimized) {
+    this._showScreenShareIndicator(totalCount);
+  } else {
+    container.style.display = 'flex';
+    const labelParts = [`🖥️ ${visibleCount} stream${visibleCount !== 1 ? 's' : ''}`];
+    if (hiddenCount > 0) labelParts.push(`(${hiddenCount} hidden)`);
+    label.textContent = labelParts.join(' ');
+  }
+},
+
+_hideScreenShare() {
+  const container = document.getElementById('screen-share-container');
+  const grid = document.getElementById('screen-share-grid');
+  // Just minimize — don't destroy streams or stop sharing
+  container.style.display = 'none';
+  this._screenShareMinimized = true;
+  // Show a "streams hidden" indicator if there are still tiles
+  if (grid.children.length > 0) {
+    this._showScreenShareIndicator(grid.children.length);
+  }
+},
+
+_showScreenShareIndicator(count) {
+  let ind = document.getElementById('screen-share-indicator');
+  if (!ind) {
+    ind = document.createElement('button');
+    ind.id = 'screen-share-indicator';
+    ind.className = 'screen-share-indicator';
+    ind.addEventListener('click', () => {
+      const container = document.getElementById('screen-share-container');
+      const grid = document.getElementById('screen-share-grid');
+      // Restore all hidden tiles and their audio
+      if (grid) {
+        grid.querySelectorAll('.screen-share-tile[data-hidden="true"]').forEach(t => {
+          t.style.display = '';
+          delete t.dataset.hidden;
+          if (t.dataset.muted === 'true') {
+            delete t.dataset.muted;
+            const uid = t.id.replace('screen-tile-', '');
+            const volSlider = t.querySelector('.stream-vol-slider');
+            const vol = volSlider ? parseInt(volSlider.value) / 100 : 1;
+            this.voice.setStreamVolume(uid, vol);
+          }
+        });
+      }
+      container.style.display = 'flex';
+      this._screenShareMinimized = false;
+      ind.remove();
+      document.getElementById('hidden-streams-bar')?.remove();
+      this._updateScreenShareVisibility();
+    });
+    document.querySelector('.channel-header')?.appendChild(ind);
+  }
+  ind.textContent = `🖥️ ${count} stream${count > 1 ? 's' : ''} hidden`;
+},
+
+_removeScreenShareIndicator() {
+  document.getElementById('screen-share-indicator')?.remove();
+},
+
+// ── Hide / Show individual stream tiles ─────────────
+
+_hideStreamTile(tile, userId, who, muteAudio = false) {
+  tile.style.display = 'none';
+  tile.dataset.hidden = 'true';
+  if (muteAudio) {
+    tile.dataset.muted = 'true';
+    // Mute this stream's audio via gain node + audio element
+    this.voice.setStreamVolume(userId, 0);
+    // Also pause the underlying audio element to guarantee silence
+    const audioEl = document.getElementById(`voice-audio-screen-${userId}`);
+    if (audioEl) { audioEl.volume = 0; try { audioEl.pause(); } catch {} }
+  }
+  // Notify server we stopped watching this stream
+  if (this.voice && this.voice.inVoice && userId && userId !== this.user.id) {
+    this.socket.emit('stream-unwatch', { code: this.voice.currentChannel, sharerId: userId });
+  }
+  this._updateHiddenStreamsBar();
+  this._updateScreenShareVisibility();
+},
+
+_showStreamTile(tileId, userId) {
+  const tile = document.getElementById(tileId);
+  if (tile) {
+    tile.style.display = '';
+    delete tile.dataset.hidden;
+    // Re-play video (browsers may pause while display:none)
+    const vid = tile.querySelector('video');
+    if (vid && vid.srcObject) vid.play().catch(() => {});
+    // Restore audio if it was muted by close
+    if (tile.dataset.muted === 'true') {
+      delete tile.dataset.muted;
+      // Resume the audio element that was paused when hiding
+      const audioEl = document.getElementById(`voice-audio-screen-${userId}`);
+      if (audioEl && audioEl.paused) { try { audioEl.play(); } catch {} }
+      // Check if the user had manually muted the stream before closing —
+      // if so, keep it muted instead of restoring volume
+      const muteBtn = tile.querySelector('.stream-mute-btn');
+      if (muteBtn && muteBtn.dataset.muted === 'true') {
+        // User had it muted — re-mute
+        if (userId) this.voice.setStreamVolume(userId, 0);
+      } else {
+        const volSlider = tile.querySelector('.stream-vol-slider');
+        const vol = volSlider ? parseInt(volSlider.value) / 100 : 1;
+        if (userId) this.voice.setStreamVolume(userId, vol);
+      }
+    }
+    // Notify server we're watching this stream again
+    if (this.voice && this.voice.inVoice && userId && userId !== this.user.id) {
+      this.socket.emit('stream-watch', { code: this.voice.currentChannel, sharerId: userId });
+    }
+  }
+  this._updateHiddenStreamsBar();
+  this._updateScreenShareVisibility();
+},
+
+_updateHiddenStreamsBar() {
+  const grid = document.getElementById('screen-share-grid');
+  const container = document.getElementById('screen-share-container');
+  let bar = document.getElementById('hidden-streams-bar');
+  const hiddenTiles = grid.querySelectorAll('.screen-share-tile[data-hidden="true"]');
+
+  if (hiddenTiles.length === 0) {
+    if (bar) bar.remove();
+    return;
+  }
+
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'hidden-streams-bar';
+    bar.className = 'hidden-streams-bar';
+    // Insert inside voice-controls so it groups with other header buttons
+    document.querySelector('.voice-controls')?.appendChild(bar);
+  }
+
+  bar.innerHTML = `<button class="hidden-stream-restore-btn" title="${t('media.show_hidden_streams')}">🖥 ${t(hiddenTiles.length === 1 ? 'media.hidden_streams_one' : 'media.hidden_streams_other', { count: hiddenTiles.length })}</button>`;
+
+  // Bind restore button — clicking it restores all hidden streams
+  bar.querySelector('.hidden-stream-restore-btn').addEventListener('click', () => {
+    hiddenTiles.forEach(t => {
+      t.style.display = '';
+      delete t.dataset.hidden;
+      const uid = t.id.replace('screen-tile-', '');
+      // Re-play video (browsers may pause while display:none)
+      const vid = t.querySelector('video');
+      if (vid && vid.srcObject) vid.play().catch(() => {});
+      // Restore audio if it was muted by close
+      if (t.dataset.muted === 'true') {
+        delete t.dataset.muted;
+        // Resume the audio element that was paused when hiding
+        const audioEl = document.getElementById(`voice-audio-screen-${uid}`);
+        if (audioEl && audioEl.paused) { try { audioEl.play(); } catch {} }
+        // Check if the user had manually muted before closing
+        const muteBtn = t.querySelector('.stream-mute-btn');
+        if (muteBtn && muteBtn.dataset.muted === 'true') {
+          this.voice.setStreamVolume(uid, 0);
+        } else {
+          const volSlider = t.querySelector('.stream-vol-slider');
+          const vol = volSlider ? parseInt(volSlider.value) / 100 : 1;
+          this.voice.setStreamVolume(uid, vol);
+        }
+      }
+      // Notify server we're watching again
+      if (this.voice && this.voice.inVoice && uid !== String(this.user?.id)) {
+        this.socket.emit('stream-watch', { code: this.voice.currentChannel, sharerId: parseInt(uid) || uid });
+      }
+    });
+    this._updateHiddenStreamsBar();
+    this._updateScreenShareVisibility();
+  });
+
+  // Show the container only if there are still visible tiles — _updateScreenShareVisibility handles this.
+  // (Removed forced container.style.display = 'flex' that caused empty gray space.)
+},
+
+_closeScreenShare() {
+  // "Close" the stream viewer by closing each visible tile the same way the
+  // per-tile ✕ does: hide it and mute its audio, but KEEP the tile (and its
+  // live track reference) in the DOM so it stays restorable from the
+  // hidden-streams bar or the LIVE badge.
+  //
+  // This deliberately does NOT:
+  //   • stop the local user's own outgoing share — that's the job of the
+  //     screen-share toggle button. Closing the *viewer* must never kill your
+  //     *broadcast* (this used to call _toggleScreenShare()).
+  //   • remove tiles or null their <video> srcObject — destroying the only
+  //     reference to a sharer's still-live track leaves no ontrack/onunmute
+  //     event to rebuild from, so the stream could never be reopened and a
+  //     reshare wouldn't reattach without a full reload. That was the root
+  //     cause of the "one X breaks everything" report.
+  const grid = document.getElementById('screen-share-grid');
+  if (!grid) return;
+  // Snapshot first — _hideStreamTile flips data-hidden as it goes, which would
+  // otherwise mutate a live NodeList mid-iteration.
+  const visibleTiles = Array.from(
+    grid.querySelectorAll('.screen-share-tile:not([data-hidden="true"])')
+  );
+  visibleTiles.forEach(tile => {
+    const raw = tile.id.replace('screen-tile-', '');
+    // Use a numeric id where possible so the stream-unwatch emitted by
+    // _hideStreamTile passes the server's isInt(sharerId) check (a string id
+    // would be silently dropped, leaving a stale viewer count).
+    const uid = /^\d+$/.test(raw) ? parseInt(raw, 10) : raw;
+    this._hideStreamTile(tile, uid, null, true);
+  });
+  // _hideStreamTile already refreshes the hidden-streams bar and collapses the
+  // container via _updateScreenShareVisibility, so there's nothing else to do.
+},
+
+// ── Screen Share Audio ──────────────────────────────
+
+_handleScreenAudio(userId) {
+  const tileId = `screen-tile-${userId || 'self'}`;
+  const tile = document.getElementById(tileId);
+  if (tile) {
+    // Remove opposite badge first (mutually exclusive)
+    tile.querySelector('.stream-no-audio-badge')?.remove();
+    if (!tile.querySelector('.stream-audio-badge')) {
+      const badge = document.createElement('div');
+      badge.className = 'stream-audio-badge';
+      badge.innerHTML = '🔊 Audio';
+      tile.appendChild(badge);
+    }
+    // If the desktop app already reported a specific audio mode for this
+    // share (per-app, system-clean, fallback, loopback), reflect it now.
+    this._applyShareAudioModeBadge(window.__havenShareAudioMode);
+    // Restore audio controls visibility since audio is available
+    const controls = document.getElementById(`stream-controls-${userId || 'self'}`);
+    if (controls) controls.style.display = '';
+  }
+  // Flash controls visible briefly
+  const controls = document.getElementById(`stream-controls-${userId || 'self'}`);
+  if (controls) {
+    controls.style.opacity = '1';
+    setTimeout(() => { controls.style.opacity = ''; }, 3000);
+  }
+},
+
+// Update the streamer's own audio badge to reflect the actual capture mode
+// reported by the desktop app. Browser users won't have this info — they'll
+// just see the generic "🔊 Audio" badge.
+_applyShareAudioModeBadge(modeInfo) {
+  if (!modeInfo) return;
+  const tile = document.getElementById(`screen-tile-${this.user?.id || 'self'}`);
+  const badge = tile?.querySelector('.stream-audio-badge');
+  if (!badge) return;
+
+  // Strip prior mode classes
+  badge.classList.remove('mode-app', 'mode-system-clean', 'mode-fallback', 'mode-loopback');
+
+  let label, cls, tip;
+  switch (modeInfo.applied) {
+    case 'app':
+      label = `🔊 App Audio${modeInfo.detail ? ` (${modeInfo.detail})` : ''}`;
+      cls   = 'mode-app';
+      tip   = `Capturing audio only from "${modeInfo.detail || 'selected app'}". No system or voice audio is included.`;
+      break;
+    case 'system-clean':
+      label = '🔊 System Audio';
+      cls   = 'mode-system-clean';
+      tip   = 'Capturing all system audio except MSG Arena. Your voice is not looped back.';
+      break;
+    case 'fallback-system-clean':
+      label = '🔊 System Audio (fallback)';
+      cls   = 'mode-fallback';
+      tip   = `Per-app capture failed, so the share is using system audio minus MSG Arena.${modeInfo.detail ? ` Reason: ${modeInfo.detail}.` : ''}`;
+      break;
+    case 'system-loopback':
+      label = '🔊 All Audio ⚠';
+      cls   = 'mode-loopback';
+      tip   = `Using raw system loopback. This may include MSG Arena\u2019s own voice output (voice loop possible).${modeInfo.detail ? ` Reason: ${modeInfo.detail}.` : ''}`;
+      break;
+    default:
+      return;
+  }
+  badge.innerHTML = label;
+  badge.classList.add(cls);
+  badge.title = tip;
+  // Also expose on the badge for tooltip-aware UIs
+  badge.setAttribute('data-mode', modeInfo.applied);
+},
+
+_handleScreenNoAudio(userId) {
+  const tileId = `screen-tile-${userId || 'self'}`;
+  const tile = document.getElementById(tileId);
+  if (!tile) {
+    // Tile may not exist yet — defer until it's created
+    const checkInterval = setInterval(() => {
+      const t = document.getElementById(tileId);
+      if (t) {
+        clearInterval(checkInterval);
+        this._applyNoAudioBadge(t, userId);
+      }
+    }, 200);
+    setTimeout(() => clearInterval(checkInterval), 5000);
+    return;
+  }
+  this._applyNoAudioBadge(tile, userId);
+},
+
+_applyNoAudioBadge(tile, userId) {
+  // Remove opposite badge first (mutually exclusive)
+  tile.querySelector('.stream-audio-badge')?.remove();
+  if (tile.querySelector('.stream-no-audio-badge')) return;
+  // Add the no-audio badge
+  const badge = document.createElement('div');
+  badge.className = 'stream-no-audio-badge';
+  badge.innerHTML = '🔇 No Audio';
+  tile.appendChild(badge);
+  // Hide audio controls since there's no audio to control
+  const controls = document.getElementById(`stream-controls-${userId || 'self'}`);
+  if (controls) controls.style.display = 'none';
+},
+
+// ── Stream Viewer Badges ─────────────────────────────
+
+_updateStreamViewerBadges() {
+  const grid = document.getElementById('screen-share-grid');
+  if (!grid) return;
+  const streams = this._streamInfo || [];
+
+  grid.querySelectorAll('.screen-share-tile').forEach(tile => {
+    const uid = tile.id.replace('screen-tile-', '');
+    const numericUid = parseInt(uid);
+    const streamInfo = streams.find(s => s.sharerId === numericUid || String(s.sharerId) === uid);
+
+    // Remove old viewer badge
+    tile.querySelector('.stream-viewer-badge')?.remove();
+
+    const viewers = streamInfo ? streamInfo.viewers : [];
+    if (viewers.length === 0) return;
+
+    const badge = document.createElement('div');
+    badge.className = 'stream-viewer-badge';
+    const names = viewers.map(v => v.username).join(', ');
+    const eyeCount = viewers.length;
+    badge.innerHTML = `<span class="viewer-eye">👁</span> ${eyeCount}`;
+    badge.title = `Watching: ${names}`;
+    tile.appendChild(badge);
+  });
+},
+
+// ── Stream Focus & Pop-out ──────────────────────────
+
+_toggleStreamFocus(tile) {
+  const container = document.getElementById('screen-share-container');
+  const grid = document.getElementById('screen-share-grid');
+  const wasFocused = tile.classList.contains('stream-focused');
+
+  // Remove focus from all tiles first
+  grid.querySelectorAll('.screen-share-tile').forEach(t => {
+    t.classList.remove('stream-focused');
+  });
+  container.classList.remove('stream-focus-mode');
+
+  if (!wasFocused) {
+    tile.classList.add('stream-focused');
+    container.classList.add('stream-focus-mode');
+    // Clear inline max-height so CSS flex constraints take over (viewport-bounded)
+    container.style.maxHeight = '';
+    grid.style.maxHeight = '';
+    const vid = tile.querySelector('video');
+    if (vid) vid.style.maxHeight = '';
+  } else {
+    // Restore slider-based size
+    const saved = localStorage.getItem('haven_stream_size') || '50';
+    const vh = parseInt(saved, 10);
+    container.style.maxHeight = vh + 'vh';
+    grid.style.maxHeight = (vh - 2) + 'vh';
+    document.querySelectorAll('.screen-share-tile video').forEach(v => { v.style.maxHeight = (vh - 4) + 'vh'; });
+  }
+},
+
+/** Collapse the stream container when all tiles are popped out (no visible streams) */
+_updateStreamContainerCollapse() {
+  const container = document.querySelector('.screen-share-container');
+  if (!container) return;
+  const tiles = container.querySelectorAll('.screen-share-tile');
+  const allPopped = tiles.length > 0 && [...tiles].every(t => t.classList.contains('stream-popped-out'));
+  container.classList.toggle('all-streams-popped', allPopped);
+},
+
+_popOutStream(tile, userId) {
+  const video = tile.querySelector('video');
+  if (!video || !video.srcObject) return;
+
+  // If already in Picture-in-Picture, exit it
+  if (document.pictureInPictureElement === video) {
+    document.exitPictureInPicture().catch(() => {});
+    return;
+  }
+
+  // If already popped out, don't open another
+  if (tile.classList.contains('stream-popped-out')) return;
+
+  // Try native Picture-in-Picture first (OS-level window, can be dragged to other screens)
+  if (document.pictureInPictureEnabled && !video.disablePictureInPicture) {
+    video.requestPictureInPicture().then(() => {
+      const popoutBtn = tile.querySelector('.stream-popout-btn');
+      if (popoutBtn) { popoutBtn.textContent = '\u29C8'; popoutBtn.title = t('media.pop_in_stream'); }
+      tile.classList.add('stream-popped-out');
+      this._updateStreamContainerCollapse();
+
+      video.addEventListener('leavepictureinpicture', () => {
+        if (popoutBtn) { popoutBtn.textContent = '\u29C9'; popoutBtn.title = t('media.pop_out_stream'); }
+        tile.classList.remove('stream-popped-out');
+        this._updateStreamContainerCollapse();
+      }, { once: true });
+    }).catch(() => {
+      // Fallback to in-page overlay if native PiP fails
+      this._popOutStreamWindow(tile, userId);
+    });
+  } else {
+    this._popOutStreamWindow(tile, userId);
+  }
+},
+
+_popOutStreamWindow(tile, userId) {
+  const video = tile.querySelector('video');
+  if (!video || !video.srcObject) return;
+
+  const stream = video.srcObject;
+  const peer = this.voice.peers.get(userId);
+  const who = userId === null || userId === this.user.id ? 'You' : (peer ? peer.username : 'Stream');
+
+  // Create floating in-page overlay (like music PiP) instead of window.open
+  const pipId = `stream-pip-${userId || 'self'}`;
+  if (document.getElementById(pipId)) return; // already open
+
+  const savedOpacity = parseInt(localStorage.getItem('haven_pip_opacity') ?? '100');
+  const pip = document.createElement('div');
+  pip.id = pipId;
+  pip.className = 'music-pip-overlay stream-pip-overlay';
+  pip.style.opacity = savedOpacity / 100;
+  pip.style.width = '480px';
+  pip.style.minHeight = '320px';
+
+  pip.innerHTML = `
+    <div class="music-pip-embed stream-pip-video"></div>
+    <div class="music-pip-controls">
+      <button class="music-pip-btn stream-pip-popin" title="${t('media.pop_back_in')}">⧈</button>
+      <span class="music-pip-label">🖥️ ${who}</span>
+      <span class="music-pip-vol-icon stream-pip-opacity-icon" title="Window opacity">👁</span>
+      <input type="range" class="music-pip-vol pip-opacity-slider stream-pip-opacity" min="20" max="100" value="${savedOpacity}">
+      <button class="music-pip-btn stream-pip-maximize" title="Maximize">⛶</button>
+      <button class="music-pip-btn stream-pip-fullscreen" title="${t('media.fullscreen')}">⤢</button>
+      <button class="music-pip-btn stream-pip-close" title="Close">✕</button>
+    </div>
+  `;
+
+  document.body.appendChild(pip);
+
+  // Clone video into PiP (keep original in tile for when user pops back in)
+  const pipVideo = document.createElement('video');
+  pipVideo.autoplay = true;
+  pipVideo.playsInline = true;
+  pipVideo.muted = true;
+  pipVideo.srcObject = stream;
+  pipVideo.style.cssText = 'width:100%;height:100%;object-fit:contain;display:block';
+  pip.querySelector('.stream-pip-video').appendChild(pipVideo);
+  pipVideo.play().catch(() => {});
+
+  const popoutBtn = tile.querySelector('.stream-popout-btn');
+  if (popoutBtn) { popoutBtn.textContent = '⧈'; popoutBtn.title = t('media.pop_in_stream'); }
+  tile.classList.add('stream-popped-out');
+  this._updateStreamContainerCollapse();
+
+  // Pop-in handler (minimize — return to inline grid)
+  const popIn = () => {
+    pip.remove();
+    if (popoutBtn) { popoutBtn.textContent = '⧉'; popoutBtn.title = t('media.pop_out_stream'); }
+    tile.classList.remove('stream-popped-out');
+    this._updateStreamContainerCollapse();
+  };
+
+  // Close handler (destroy PiP overlay AND hide the inline tile)
+  const closePip = () => {
+    pip.remove();
+    if (popoutBtn) { popoutBtn.textContent = '⧉'; popoutBtn.title = t('media.pop_out_stream'); }
+    tile.classList.remove('stream-popped-out');
+    this._updateStreamContainerCollapse();
+    // Also hide the stream tile — user wants to close the stream, not just pop back in
+    const peer = this.voice.peers.get(userId);
+    const who2 = userId === null || userId === this.user.id ? 'You' : (peer ? peer.username : 'Stream');
+    this._hideStreamTile(tile, userId, who2, true);
+  };
+
+  pip.querySelector('.stream-pip-popin').addEventListener('click', popIn);
+  pip.querySelector('.stream-pip-close').addEventListener('click', closePip);
+  pip.querySelector('.stream-pip-fullscreen').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const vid = pip.querySelector('video');
+    const target = vid || pip;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      (target.requestFullscreen || target.webkitRequestFullscreen).call(target).catch(() => {});
+    }
+  });
+
+  // Maximize toggle — snap the overlay to fill the whole window (a full monitor
+  // when the browser is maximized on it), then restore the previous size.
+  const maxBtn = pip.querySelector('.stream-pip-maximize');
+  maxBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const maximized = pip.classList.toggle('stream-pip-maximized');
+    maxBtn.classList.toggle('active', maximized);
+    maxBtn.title = maximized ? 'Restore' : 'Maximize';
+  });
+
+  pip.querySelector('.stream-pip-opacity').addEventListener('input', (e) => {
+    const val = parseInt(e.target.value);
+    pip.style.opacity = val / 100;
+    localStorage.setItem('haven_pip_opacity', val);
+  });
+
+  // Dragging (whole overlay is drag handle, except buttons/sliders)
+  this._initPipDrag(pip, pip);
+
+  // Clean up if stream ends
+  const streamTrack = stream.getVideoTracks()[0];
+  if (streamTrack) {
+    const prevOnEnded = streamTrack.onended;
+    streamTrack.onended = () => {
+      if (prevOnEnded) prevOnEnded();
+      popIn();
+    };
+  }
+},
+
+// ── Music Streaming ───────────────────────────────
+
+_openMusicModal() {
+  if (!this.voice || !this.voice.inVoice) {
+    this._showToast(t('toasts.join_voice_first'), 'error');
+    return;
+  }
+  document.getElementById('music-link-input').value = '';
+  document.getElementById('music-link-preview').innerHTML = '';
+  document.getElementById('music-link-preview').classList.remove('active');
+  this._updateMusicModalButtons(null);
+  document.getElementById('music-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('music-link-input').focus(), 100);
+},
+
+_closeMusicModal() {
+  document.getElementById('music-modal').style.display = 'none';
+},
+//Determine playlist ID
+_getYouTubePlaylistInfo(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+    const isYouTubeHost = host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com' || host === 'youtu.be';
+    if (!isYouTubeHost) return null;
+    const listId = parsed.searchParams.get('list');
+    if (!listId) return null;
+    if (parsed.pathname === '/playlist') return { isPlaylistOnly: true, playlistId: listId };
+    const videoId = host === 'youtu.be'
+      ? parsed.pathname.replace(/^\/+/, '').split('/')[0]
+      : parsed.searchParams.get('v');
+    if (videoId) return { isPlaylistOnly: false, videoId, playlistId: listId };
+  } catch {}
+  return null;
+},
+
+_updateMusicModalButtons(url) {
+  const shareBtn = document.getElementById('share-music-btn');
+  const playlistBtn = document.getElementById('share-music-playlist-btn');
+  if (!shareBtn || !playlistBtn) return;
+  const info = url ? this._getYouTubePlaylistInfo(url) : null;
+  if (info?.isPlaylistOnly) {
+    shareBtn.style.display = 'none';
+    playlistBtn.style.display = '';
+  } else if (info) {
+    shareBtn.style.display = '';
+    playlistBtn.style.display = '';
+  } else {
+    shareBtn.style.display = '';
+    playlistBtn.style.display = 'none';
+  }
+},
+
+_previewMusicLink(url) {
+  const preview = document.getElementById('music-link-preview');
+  if (!url) {
+    preview.innerHTML = '';
+    preview.classList.remove('active');
+    this._updateMusicModalButtons(null);
+    return;
+  }
+  const playlistInfo = this._getYouTubePlaylistInfo(url);
+  if (playlistInfo) { //Conditional display of playlist parsing
+    preview.classList.add('active');
+    preview.innerHTML = playlistInfo.isPlaylistOnly
+      ? '🔴 <strong>YouTube Playlist</strong> - Ready to share'
+      : '🔴 <strong>YouTube</strong> - Video in a playlist';
+    this._updateMusicModalButtons(url);
+    return;
+  }
+  const platform = this._getMusicPlatform(url);
+  const embedUrl = this._getMusicEmbed(url);
+  if (platform && embedUrl) {
+    preview.classList.add('active');
+    preview.innerHTML = `${platform.icon} <strong>${platform.name}</strong> — Ready to share`;
+  } else {
+    preview.classList.remove('active');
+    preview.innerHTML = '';
+  }
+  this._updateMusicModalButtons(url);
+},
+
+_shareMusic() {
+  const url = document.getElementById('music-link-input').value.trim();
+  if (!url) { this._showToast(t('toasts.paste_music_link'), 'error'); return; }
+  if (!this._getMusicEmbed(url)) {
+    this._showToast(t('toasts.unsupported_music_link'), 'error');
+    return;
+  }
+  if (!this.voice || !this.voice.inVoice) { this._showToast(t('toasts.join_voice_required'), 'error'); return; }
+  this.socket.emit('music-share', { code: this.voice.currentChannel, url });
+  this._closeMusicModal();
+},
+//Playlist queue addition
+_shareMusicPlaylist() {
+  const url = document.getElementById('music-link-input').value.trim();
+  if (!url) { this._showToast('Please paste a music link', 'error'); return; }
+  const info = this._getYouTubePlaylistInfo(url);
+  if (!info?.playlistId) { this._showToast('No playlist found in this link', 'error'); return; }
+  if (!this.voice || !this.voice.inVoice) { this._showToast('Join voice first', 'error'); return; }
+  this.socket.emit('music-share-playlist', { code: this.voice.currentChannel, playlistId: info.playlistId });
+  this._closeMusicModal();
+},
+
+_stopMusic() { //Check for music management role to halt playback
+  if (!this._canControlMusic()) {
+    this._showToast('Only the requestor or a moderator can stop playback', 'error');
+    return;
+  }
+  if (this.voice && this.voice.inVoice) {
+    this.socket.emit('music-stop', { code: this.voice.currentChannel });
+  }
+  this._hideMusicPanel();
+},
+
+_showMusicSearchResults(data) {
+  // Remove any existing search picker
+  this._closeMusicSearchPicker();
+
+  const { results, query, offset } = data;
+  if (!results || results.length === 0) {
+    this._showToast(offset > 0 ? t('toasts.no_more_results') : t('toasts.no_results_for', { query }), 'error');
+    return;
+  }
+
+  const picker = document.createElement('div');
+  picker.id = 'music-search-picker';
+  picker.className = 'music-search-picker';
+  picker.innerHTML = `
+    <div class="music-search-picker-header">
+      <span>🔍 Results for "<strong>${this._escapeHtml(query)}</strong>"</span>
+      <button class="music-search-picker-close" title="Cancel">✕</button>
+    </div>
+    <div class="music-search-picker-list">
+      ${results.map((r, i) => `
+        <div class="music-search-picker-item" data-video-id="${r.videoId}" data-title="${this._escapeHtml(r.title || `Result ${offset + i + 1}`)}">
+          <div class="music-search-picker-thumb">
+            ${r.thumbnail ? `<img src="${this._escapeHtml(r.thumbnail)}" alt="" loading="lazy">` : '<span>🎵</span>'}
+          </div>
+          <div class="music-search-picker-info">
+            <div class="music-search-picker-title">${this._escapeHtml(r.title || `Result ${offset + i + 1}`)}</div>
+            <div class="music-search-picker-meta">${this._escapeHtml(r.channel)}</div>
+          </div>
+          <button class="music-search-picker-play" data-video-id="${r.videoId}" data-title="${this._escapeHtml(r.title || `Result ${offset + i + 1}`)}" title="Play this">▶</button>
+        </div>
+      `).join('')}
+    </div>
+    <div class="music-search-picker-footer">
+      <button class="music-search-picker-more">More results</button>
+      <button class="music-search-picker-cancel">Cancel</button>
+    </div>
+  `;
+
+  // Insert above the message input area
+  const msgArea = document.getElementById('message-area');
+  msgArea.appendChild(picker);
+
+  // Event handlers
+  picker.querySelector('.music-search-picker-close').addEventListener('click', () => this._closeMusicSearchPicker());
+  picker.querySelector('.music-search-picker-cancel').addEventListener('click', () => this._closeMusicSearchPicker());
+  picker.querySelector('.music-search-picker-more').addEventListener('click', () => {
+    const newOffset = (offset || 0) + 5;
+    this._musicSearchOffset = newOffset;
+    this.socket.emit('music-search', { query: this._musicSearchQuery, offset: newOffset });
+    this._closeMusicSearchPicker();
+    this._showToast(t('toasts.loading_more'), 'info');
+  });
+
+  picker.querySelectorAll('.music-search-picker-play').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const videoId = btn.dataset.videoId;
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      this.socket.emit('music-share', {
+        code: this.voice.currentChannel,
+        url,
+        title: btn.dataset.title || ''
+      });
+      this._closeMusicSearchPicker();
+    });
+  });
+
+  // Also allow clicking the whole row
+  picker.querySelectorAll('.music-search-picker-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.music-search-picker-play')) return; // already handled
+      const videoId = item.dataset.videoId;
+      const url = `https://www.youtube.com/watch?v=${videoId}`;
+      this.socket.emit('music-share', {
+        code: this.voice.currentChannel,
+        url,
+        title: item.dataset.title || ''
+      });
+      this._closeMusicSearchPicker();
+    });
+  });
+},
+
+_closeMusicSearchPicker() {
+  const existing = document.getElementById('music-search-picker');
+  if (existing) existing.remove();
+},
+
+_handleMusicShared(data) {
+  //Switch to active voice channel if reconnecting and music is shared so playback will resume
+  if (!this.currentChannel && this.voice && this.voice.currentChannel) {
+    this.switchChannel(this.voice.currentChannel);
+  }
+  const embedUrl = this._getMusicEmbed(data.url);
+  if (!embedUrl) return;
+  const platform = this._getMusicPlatform(data.url);
+  const panel = document.getElementById('music-panel');
+  const container = document.getElementById('music-embed-container');
+  const label = document.getElementById('music-panel-label');
+  if (this.voice && this.voice.inVoice) this._updateVoiceButtons(true);
+
+  // Clean up previous player references
+  this._musicYTPlayer = null;
+  this._musicSCWidget = null;
+  this._musicPlatform = platform ? platform.name : null;
+  this._musicPlaying = data.syncState?.isPlaying !== false;
+  this._musicActive = true;
+  this._musicUrl = data.url;
+  this._musicTrackId = data.trackId || null;
+  this._musicRequestorId = data.userId || null;
+  this._setMusicActivityHint('');
+  this._pendingMusicSyncState = data.syncState || null;
+  this._musicSuppressBroadcastUntil = 0;
+  this._musicLastTrackedPosition = null;
+  this._musicLastTrackedAt = 0;
+  this._musicLastSeekBroadcastAt = 0;
+  this._removeMusicIndicator();
+
+  let iframeH = '152';
+  if (data.url.includes('spotify.com')) iframeH = '152';
+  else if (data.url.includes('soundcloud.com')) iframeH = '166';
+  else if (data.url.includes('youtube.com') || data.url.includes('youtu.be')) iframeH = '200';
+
+  // Wrap iframe in a container; overlay blocks direct clicks for SoundCloud (MSG Arena has API control)
+  // For Spotify & YouTube, no overlay — user interacts with their native controls (seek bar, etc.)
+  const isSpotify = data.url.includes('spotify.com');
+  const isYouTube = data.url.includes('youtube.com') || data.url.includes('youtu.be') || data.url.includes('music.youtube.com');
+  const needsOverlay = !isSpotify && !isYouTube; // only SoundCloud gets the click-blocker now
+  // YouTube embeds: origin param tells Google which page hosts the iframe.
+  // We skip referrerpolicy=no-referrer so the IFrame API (enablejsapi) can
+  // communicate with the parent window; the origin= param already handles
+  // the "Video unavailable" issue that self-hosted instances used to trigger.
+  // Same per-iframe referrerpolicy as the chat YouTube embed. The document
+  // default (same-origin since 3.41.0) sends no referrer cross-origin, which
+  // YouTube reports as "Error 153" and other providers can reject too. The
+  // origin alone is enough for them and carries no invite code.
+  container.innerHTML = `<div class="music-embed-wrapper"><iframe id="music-iframe" src="${embedUrl}" width="100%" height="${iframeH}" frameborder="0" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>${needsOverlay ? '<div class="music-embed-overlay"></div>' : ''}</div>`;
+  if (data.resolvedFrom === 'spotify') {
+    label.textContent = `🎵 🟢 Spotify (via YouTube) — shared by ${data.username || 'someone'}`;
+  } else {
+    label.textContent = `🎵 ${platform ? platform.name : 'Music'} — shared by ${data.username || 'someone'}`;
+  }
+  panel.style.display = 'flex';
+
+  // Update play/pause button — hide for Spotify (no external API)
+  const ppBtn = document.getElementById('music-play-pause-btn');
+  if (ppBtn) {
+    ppBtn.textContent = isSpotify ? '' : (data.syncState?.isPlaying === false ? '▶' : '⏸');
+    ppBtn.style.display = isSpotify ? 'none' : '';
+  }
+
+  // Seek bar — hide for Spotify (no external API for position tracking)
+  const seekSlider = document.getElementById('music-seek-slider');
+  const timeCur = document.getElementById('music-time-current');
+  const timeDur = document.getElementById('music-time-duration');
+  const hideSeek = isSpotify;
+  if (seekSlider) seekSlider.style.display = hideSeek ? 'none' : '';
+  if (timeCur) timeCur.style.display = hideSeek ? 'none' : '';
+  if (timeDur) timeDur.style.display = hideSeek ? 'none' : '';
+
+  // Apply saved volume
+  const savedVol = parseInt(localStorage.getItem('haven_music_volume') ?? '80');
+  document.getElementById('music-volume-slider').value = savedVol;
+
+  // For Spotify: volume can only be controlled inside the embed — show disclaimer
+  const volSlider = document.getElementById('music-volume-slider');
+  const muteBtn = document.getElementById('music-mute-btn');
+  if (isSpotify) {
+    if (volSlider) { volSlider.disabled = true; volSlider.title = t('media.spotify_volume_hint'); }
+    if (muteBtn) { muteBtn.disabled = true; muteBtn.title = t('media.spotify_volume_hint'); }
+  } else {
+    if (volSlider) { volSlider.disabled = false; volSlider.title = ''; }
+    if (muteBtn) { muteBtn.disabled = false; muteBtn.title = t('media.mute_unmute'); }
+  }
+
+  // Show next button for SoundCloud (has internal tracks) or when the queue has items
+  const isSoundCloud = data.url.includes('soundcloud.com');
+  const nextBtn = document.getElementById('music-next-btn');
+  const hasQueue = (this._musicQueue?.length || 0) > 0;
+  if (nextBtn) nextBtn.style.display = (isSoundCloud || hasQueue) && !isSpotify ? '' : 'none';
+
+
+  // Initialize platform-specific APIs for volume & sync control
+  const iframe = document.getElementById('music-iframe');
+  if (iframe) {
+    if (data.url.includes('youtube.com') || data.url.includes('youtu.be') || data.url.includes('music.youtube.com')) {
+      this._initYouTubePlayer(iframe, savedVol);
+    } else if (data.url.includes('soundcloud.com')) {
+      this._initSoundCloudWidget(iframe, savedVol);
+    }
+  }
+
+  const who = data.userId === this.user?.id ? 'You shared' : `${data.username} shared`;
+  this._applyMusicControlPermissions();
+
+  const platformLabel = data.resolvedFrom === 'spotify' ? 'Spotify (via YouTube)' : (platform ? platform.name : 'music');
+  this._showToast(`${who} ${platformLabel}`, 'info');
+},
+//Check for perms to adjust music stuff, like queue and removals
+_canControlMusic() {
+  return this.user?.isAdmin ||
+    this._musicRequestorId === this.user?.id ||
+    this._hasPerm('manage_music_queue');
+},
+//Music control permission validation
+_applyMusicControlPermissions() {
+  const allowed = this._canControlMusic();
+  const restricted = 'Only the requestor or a moderator can do this';
+  const ppBtn = document.getElementById('music-play-pause-btn');
+  const seekSlider = document.getElementById('music-seek-slider');
+  const nextBtn = document.getElementById('music-next-btn');
+  const stopBtn = document.getElementById('music-stop-btn');
+  const pipPpBtn = document.getElementById('music-pip-pp');
+  const pipStopBtn = document.getElementById('music-pip-close');
+  if (ppBtn) {
+    ppBtn.disabled = !allowed;
+    ppBtn.title = allowed ? 'Play/Pause' : restricted;
+  }
+  if (seekSlider) {
+    seekSlider.disabled = !allowed;
+    seekSlider.title = allowed ? 'Seek' : restricted;
+  }
+  if (nextBtn) {
+    nextBtn.disabled = !allowed;
+    nextBtn.title = allowed ? 'Next track' : restricted;
+  }
+  if (stopBtn) {
+    stopBtn.disabled = !allowed;
+    stopBtn.title = allowed ? 'Close / stop music' : restricted;
+  }
+  if (pipPpBtn) {
+    pipPpBtn.disabled = !allowed;
+    pipPpBtn.title = allowed ? 'Play/Pause' : restricted;
+  }
+  if (pipStopBtn) {
+    pipStopBtn.disabled = !allowed;
+    pipStopBtn.title = allowed ? 'Close / stop music' : restricted;
+  }
+},
+
+_updateMusicQueueState(payload) {
+  const queue = Array.isArray(payload?.queue) ? payload.queue : [];
+  this._musicQueue = queue;
+  this._musicUpNext = payload?.upNext || queue[0] || null;
+  this._syncMusicQueueUi();
+  this._renderMusicQueueModal();
+  const nextBtn = document.getElementById('music-next-btn');
+  if (nextBtn && nextBtn.style.display !== 'none') {
+    if (!this._musicUrl?.includes('soundcloud.com') && queue.length === 0) {
+      nextBtn.style.display = 'none';
+    }
+  } else if (nextBtn && queue.length > 0 && !this._musicUrl?.includes('spotify.com')) {
+    nextBtn.style.display = '';
+  }
+},
+
+_syncMusicQueueUi() {
+  const text = this._musicUpNext?.title
+    ? `Up next: ${this._truncateMusicQueueTitle(this._musicUpNext.title, 54)}`
+    : 'Up next: Nothing queued';
+  const title = this._musicUpNext?.title || 'Nothing queued';
+  const targets = ['music-up-next', 'music-pip-up-next'];
+  targets.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.title = title;
+  });
+},
+
+_setMusicActivityHint(text) {
+  ['music-activity-hint', 'music-pip-activity-hint'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  });
+},
+//Trim titles to save on modaL small space
+_truncateMusicQueueTitle(title, max = 54) {
+  if (!title || title.length <= max) return title || '';
+  return title.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+},
+
+_openMusicQueueModal() {
+  this._renderMusicQueueModal();
+  document.getElementById('music-queue-modal').style.display = 'flex';
+},
+
+_closeMusicQueueModal() {
+  document.getElementById('music-queue-modal').style.display = 'none';
+},
+//Table modal for queue management
+_renderMusicQueueModal() {
+  const body = document.getElementById('music-queue-body');
+  const summary = document.getElementById('music-queue-summary');
+  const table = body?.closest('.music-queue-table');
+  const tableWrap = table?.closest('.music-queue-table-wrap');
+  if (!body || !summary || !table || !tableWrap) return;
+  const queue = this._musicQueue || [];
+  const canManage = this.user?.isAdmin || this._hasPerm('manage_music_queue');
+  table.classList.toggle('music-queue-readonly', !canManage);
+  const shuffleBtn = document.getElementById('shuffle-music-queue-btn');
+  if (shuffleBtn) shuffleBtn.style.display = (canManage && queue.length >= 2) ? '' : 'none';
+  summary.textContent = queue.length
+    ? `${queue.length} queued track${queue.length === 1 ? '' : 's'}`
+    : 'No queued tracks';
+  if (!queue.length) {
+    body.innerHTML = '<tr><td colspan="5" class="music-queue-empty">Queue is empty</td></tr>';
+    return;
+  }
+  body.innerHTML = queue.map((item, idx) => `
+    <tr class="music-queue-row" data-entry-id="${this._escapeHtml(item.id)}" draggable="${canManage ? 'true' : 'false'}">
+      <td class="music-queue-col-handle">${canManage ? '<span class="music-queue-drag-handle" title="Drag to reorder">⋮⋮</span>' : ''}</td>
+      <td class="music-queue-col-pos"><span class="music-queue-pos">${idx + 1}</span></td>
+      <td class="music-queue-col-requested-by">
+        <span class="music-queue-requestor" title="${this._escapeHtml(item.username || 'Unknown')}">${this._escapeHtml(this._truncateMusicQueueTitle(item.username || 'Unknown', 24))}</span>
+      </td>
+      <td class="music-queue-title-cell">
+        <div class="music-queue-title" title="${this._escapeHtml(item.title || 'Untitled track')}">${this._escapeHtml(this._truncateMusicQueueTitle(item.title || 'Untitled track', 80))}</div>
+      </td>
+      <td class="music-queue-col-actions">${canManage ? '<button class="music-queue-remove-btn" title="Remove from queue">✕</button>' : ''}</td>
+    </tr>
+  `).join('');
+
+  body.querySelectorAll('.music-queue-remove-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const row = e.target.closest('.music-queue-row');
+      const entryId = row?.dataset.entryId;
+      if (!entryId || !this.voice?.currentChannel) return;
+      this.socket.emit('music-queue-remove', { code: this.voice.currentChannel, entryId });
+    });
+  });
+
+  if (canManage) {
+    let dragEntryId = null;
+    const scrollDraggedTable = (deltaY) => {
+      if (!dragEntryId || !deltaY) return;
+      tableWrap.scrollTop += deltaY;
+    };
+    tableWrap.onwheel = (e) => {
+      if (!dragEntryId) return;
+      e.preventDefault();
+      scrollDraggedTable(e.deltaY);
+    };
+    tableWrap.ondragover = (e) => {
+      if (!dragEntryId) return;
+      const rect = tableWrap.getBoundingClientRect();
+      const edgeThreshold = 48;
+      if (e.clientY < rect.top + edgeThreshold) scrollDraggedTable(-18);
+      else if (e.clientY > rect.bottom - edgeThreshold) scrollDraggedTable(18);
+    };
+    body.querySelectorAll('.music-queue-row').forEach(row => {
+      // dragstart fires on the <tr> (the draggable element), so e.target is always the
+      // row — never the handle child. Track mousedown on the handle instead.
+      let dragFromHandle = false;
+      row.querySelector('.music-queue-drag-handle')?.addEventListener('mousedown', () => {
+        dragFromHandle = true;
+      });
+      row.addEventListener('mouseup', () => {
+        dragFromHandle = false;
+      });
+      row.addEventListener('dragstart', (e) => {
+        if (!dragFromHandle) { e.preventDefault(); return; }
+        dragFromHandle = false;
+        dragEntryId = row.dataset.entryId;
+        row.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      row.addEventListener('dragend', () => {
+        dragFromHandle = false;
+        row.classList.remove('dragging');
+        body.querySelectorAll('.music-queue-row').forEach(r => r.classList.remove('drag-over'));
+      });
+      row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!dragEntryId || dragEntryId === row.dataset.entryId) return;
+        body.querySelectorAll('.music-queue-row').forEach(r => r.classList.toggle('drag-over', r === row));
+      });
+      row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const targetId = row.dataset.entryId;
+        body.querySelectorAll('.music-queue-row').forEach(r => r.classList.remove('drag-over'));
+        if (!dragEntryId || !targetId || dragEntryId === targetId || !this.voice?.currentChannel) return;
+        const nextIds = [...queue.map(item => item.id)];
+        const from = nextIds.indexOf(dragEntryId);
+        const to = nextIds.indexOf(targetId);
+        if (from === -1 || to === -1) return;
+        const [moved] = nextIds.splice(from, 1);
+        nextIds.splice(to, 0, moved);
+        this.socket.emit('music-queue-reorder', { code: this.voice.currentChannel, entryIds: nextIds });
+      });
+    });
+  } else {
+    tableWrap.onwheel = null;
+    tableWrap.ondragover = null;
+  }
+},
+//Basic queue shuffle, rendered in-modal
+_shuffleMusicQueue() {
+  if (!this.voice?.currentChannel) return;
+  this.socket.emit('music-queue-shuffle', { code: this.voice.currentChannel });
+},
+
+_suppressMusicBroadcasts(ms = 1500) {
+  this._musicSuppressBroadcastUntil = Date.now() + ms;
+},
+
+_shouldSuppressMusicBroadcasts() {
+  return Date.now() < (this._musicSuppressBroadcastUntil || 0);
+},
+
+_setMusicPlayingUi(isPlaying) {
+  this._musicPlaying = !!isPlaying;
+  const label = this._musicPlaying ? '⏸' : '▶';
+  const ppBtn = document.getElementById('music-play-pause-btn');
+  if (ppBtn && ppBtn.style.display !== 'none') ppBtn.textContent = label;
+  const pipPP = document.getElementById('music-pip-pp');
+  if (pipPP) pipPP.textContent = label;
+},
+
+_getEffectiveMusicSyncState(syncState) {
+  if (!syncState) return null;
+  const effective = { ...syncState };
+  if (effective.isPlaying && Number.isFinite(effective.positionSeconds)) {
+    const updatedAt = Number(effective.updatedAt);
+    if (Number.isFinite(updatedAt) && updatedAt > 0) {
+      const elapsed = Math.max(0, Date.now() - updatedAt) / 1000;
+      effective.positionSeconds += elapsed;
+      if (Number.isFinite(effective.durationSeconds)) {
+        effective.positionSeconds = Math.min(effective.positionSeconds, effective.durationSeconds);
+      }
+    }
+  }
+  return effective;
+},
+
+_withMusicTiming(callback) {
+  if (this._musicYTPlayer && this._musicYTPlayer.getCurrentTime && this._musicYTPlayer.getDuration) {
+    const positionSeconds = this._musicYTPlayer.getCurrentTime() || 0;
+    const durationSeconds = this._musicYTPlayer.getDuration() || 0;
+    callback(positionSeconds, durationSeconds);
+    return;
+  }
+  if (this._musicSCWidget) {
+    this._musicSCWidget.getPosition((pos) => {
+      this._musicSCWidget.getDuration((dur) => {
+        callback((pos || 0) / 1000, (dur || 0) / 1000);
+      });
+    });
+    return;
+  }
+  callback(0, 0);
+},
+
+_withMusicDuration(callback) {
+  if (this._musicYTPlayer && this._musicYTPlayer.getDuration) {
+    callback(this._musicYTPlayer.getDuration() || 0);
+    return;
+  }
+  if (this._musicSCWidget) {
+    this._musicSCWidget.getDuration((dur) => {
+      callback((dur || 0) / 1000);
+    });
+    return;
+  }
+  callback(0);
+},
+
+_captureCurrentMusicSyncState(callback) {
+  if (!this._musicActive) {
+    callback(null);
+    return;
+  }
+  this._withMusicTiming((positionSeconds, durationSeconds) => {
+    callback({
+      isPlaying: !!this._musicPlaying,
+      positionSeconds: Number.isFinite(positionSeconds) ? Math.max(0, positionSeconds) : 0,
+      durationSeconds: Number.isFinite(durationSeconds) && durationSeconds >= 0 ? durationSeconds : null,
+      updatedAt: Date.now()
+    });
+  });
+},
+
+_restoreMusicSyncStateAfterMove(syncState) {
+  if (!syncState) return;
+  this._pendingMusicSyncState = syncState;
+  this._suppressMusicBroadcasts(2500);
+  const apply = () => this._applyMusicSyncState(syncState);
+  /* The embed iframe is moved in the DOM during pop-out/pop-in, which can briefly interrupt the YT/SC player API.
+  Cascade three attempts at increasing delays to catch whichever moment the player finishes re-stabilizing. Should probably
+   convert this to a triggered event from the pop-out later by adding a trigger.*/
+  requestAnimationFrame(() => setTimeout(apply, 0));
+  setTimeout(apply, 150);
+  setTimeout(apply, 500);
+},
+
+_emitMusicControl(action) {
+  if (!this.voice || !this.voice.inVoice) return;
+  this._withMusicTiming((positionSeconds, durationSeconds) => {
+    this.socket.emit('music-control', {
+      code: this.voice.currentChannel,
+      action,
+      positionSeconds,
+      durationSeconds
+    });
+  });
+},
+
+_emitMusicFinished(isSkip = false) {
+  if (!this.voice || !this.voice.inVoice || !this._musicTrackId) return;
+  this._withMusicTiming((positionSeconds, durationSeconds) => {
+    this.socket.emit('music-finished', {
+      code: this.voice.currentChannel,
+      trackId: this._musicTrackId,
+      positionSeconds: Number.isFinite(positionSeconds) ? positionSeconds : undefined,
+      durationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : undefined,
+      ...(isSkip && { isSkip: true })
+    });
+  });
+},
+
+_emitMusicSeek(positionSeconds, durationSeconds) {
+  if (!this.voice || !this.voice.inVoice) return;
+  const pct = durationSeconds > 0 ? (positionSeconds / durationSeconds) * 100 : undefined;
+  this.socket.emit('music-seek', {
+    code: this.voice.currentChannel,
+    position: pct,
+    positionSeconds,
+    durationSeconds
+  });
+  this._musicLastTrackedPosition = positionSeconds;
+  this._musicLastTrackedAt = Date.now();
+  this._musicLastSeekBroadcastAt = Date.now();
+},
+
+_seekMusicToSeconds(seconds) {
+  try {
+    if (this._musicYTPlayer && this._musicYTPlayer.seekTo) {
+      this._musicYTPlayer.seekTo(Math.max(0, seconds), true);
+    } else if (this._musicSCWidget) {
+      this._musicSCWidget.seekTo(Math.max(0, seconds) * 1000);
+    }
+  } catch { /* player gone? */ }
+},
+
+_applyMusicSyncState(syncState) {
+  if (!syncState) return;
+  const effectiveState = this._getEffectiveMusicSyncState(syncState);
+  if (!this._musicYTPlayer && !this._musicSCWidget) {
+    this._pendingMusicSyncState = effectiveState;
+    return;
+  }
+  this._pendingMusicSyncState = null;
+  this._suppressMusicBroadcasts();
+  if (Number.isFinite(effectiveState.positionSeconds)) {
+    this._seekMusicToSeconds(effectiveState.positionSeconds);
+    this._musicLastTrackedPosition = effectiveState.positionSeconds;
+    this._musicLastTrackedAt = Date.now();
+  }
+  if (typeof effectiveState.isPlaying === 'boolean') {
+    if (effectiveState.isPlaying) this._playMusicEmbed();
+    else this._pauseMusicEmbed();
+    this._setMusicPlayingUi(effectiveState.isPlaying);
+  }
+},
+
+_flushPendingMusicSyncState() {
+  if (this._pendingMusicSyncState) this._applyMusicSyncState(this._pendingMusicSyncState);
+},
+
+_initYouTubePlayer(iframe, volume) {
+  // YouTube IFrame API — load the API script once, then create a player
+  if (!window.YT || !window.YT.Player) {
+    if (!document.getElementById('yt-iframe-api')) {
+      const tag = document.createElement('script');
+      tag.id = 'yt-iframe-api';
+      tag.src = 'https://www.youtube.com/iframe_api';
+      document.head.appendChild(tag);
+    }
+    // Wait for API to load, then retry
+    const check = setInterval(() => {
+      if (window.YT && window.YT.Player) {
+        clearInterval(check);
+        this._createYTPlayer(iframe, volume);
+      }
+    }, 200);
+    setTimeout(() => clearInterval(check), 10000); // give up after 10s
+  } else {
+    this._createYTPlayer(iframe, volume);
+  }
+},
+
+_createYTPlayer(iframe, volume) {
+  try {
+    this._musicYTPlayer = new YT.Player(iframe, {
+      events: {
+        onReady: (e) => {
+          e.target.setVolume(volume);
+          this._startMusicTimeTracking();
+          this._flushPendingMusicSyncState();
+        },
+        onStateChange: (e) => {
+          // Sync MSG Arena's play/pause state when user interacts with YT's native controls
+          if (e.data === YT.PlayerState.PLAYING) {
+            this._setMusicPlayingUi(true);
+            if (!this._shouldSuppressMusicBroadcasts()) this._emitMusicControl('play');
+          } else if (e.data === YT.PlayerState.PAUSED) {
+            this._setMusicPlayingUi(false);
+            if (!this._shouldSuppressMusicBroadcasts()) this._emitMusicControl('pause');
+          } else if (e.data === YT.PlayerState.ENDED) {
+            // Signal the server — it will pop the queue and emit music-shared for the next track
+            this._setMusicPlayingUi(false);
+            this._emitMusicFinished();
+          }
+        }
+      }
+    });
+  } catch { /* iframe may already be destroyed */ }
+},
+
+_initSoundCloudWidget(iframe, volume) {
+  // SoundCloud Widget API
+  if (!window.SC || !window.SC.Widget) {
+    if (!document.getElementById('sc-widget-api')) {
+      const tag = document.createElement('script');
+      tag.id = 'sc-widget-api';
+      tag.src = 'https://w.soundcloud.com/player/api.js';
+      document.head.appendChild(tag);
+    }
+    const check = setInterval(() => {
+      if (window.SC && window.SC.Widget) {
+        clearInterval(check);
+        this._createSCWidget(iframe, volume);
+      }
+    }, 200);
+    setTimeout(() => clearInterval(check), 10000);
+  } else {
+    this._createSCWidget(iframe, volume);
+  }
+},
+
+_createSCWidget(iframe, volume) {
+  try {
+    this._musicSCWidget = SC.Widget(iframe);
+    this._musicSCShuffle = false;
+    this._musicSCTrackCount = 0;
+    this._musicSCCurrentIndex = 0;
+    this._musicSCWidget.bind(SC.Widget.Events.READY, () => {
+      this._musicSCWidget.setVolume(volume);
+      this._startMusicTimeTracking();
+      this._flushPendingMusicSyncState();
+      // Get track count for shuffle support
+      this._musicSCWidget.getSounds((sounds) => {
+        this._musicSCTrackCount = sounds ? sounds.length : 0;
+      });
+    });
+    // Auto-advance on track finish (supports shuffle)
+    this._musicSCWidget.bind(SC.Widget.Events.FINISH, () => {
+      if (this._musicSCShuffle && this._musicSCTrackCount > 1) {
+        // Pick a random track that isn't the current one
+        let next = (this._musicSCCurrentIndex + 1) % this._musicSCTrackCount;
+        if (this._musicSCTrackCount > 2) {
+          next = Math.floor(Math.random() * (this._musicSCTrackCount - 1));
+          if (next >= this._musicSCCurrentIndex) next++;
+        }
+        this._musicSCCurrentIndex = next;
+        this._musicSCWidget.skip(next);
+      } else {
+        if (this._musicSCTrackCount > 1) this._musicSCWidget.next();
+        else this._emitMusicFinished();
+      }
+    });
+    // Track current index for shuffle
+    this._musicSCWidget.bind(SC.Widget.Events.PLAY, () => {
+      this._setMusicPlayingUi(true);
+      if (!this._shouldSuppressMusicBroadcasts()) this._emitMusicControl('play');
+      this._musicSCWidget.getCurrentSoundIndex((idx) => { this._musicSCCurrentIndex = idx; });
+    });
+    this._musicSCWidget.bind(SC.Widget.Events.PAUSE, () => {
+      this._setMusicPlayingUi(false);
+      if (!this._shouldSuppressMusicBroadcasts()) this._emitMusicControl('pause');
+    });
+  } catch { /* iframe may already be destroyed */ }
+},
+
+_handleMusicStopped(data) {
+  this._stopMusicTimeTracking();
+  this._musicYTPlayer = null;
+  this._musicSCWidget = null;
+  this._musicPlatform = null;
+  this._musicTrackId = null;
+  this._musicRequestorId = null;
+  this._musicPlaying = false;
+  this._hideMusicPanel();
+  this._updateMusicQueueState({ queue: [], upNext: null });
+  const who = data.userId === this.user?.id ? 'You' : (data.username || 'Someone');
+  this._showToast(t('voice.music_stopped', { who }), 'info');
+},
+
+_handleMusicControl(data) {
+  if (data.action === 'pause') {
+    this._suppressMusicBroadcasts();
+    this._pauseMusicEmbed();
+    this._setMusicPlayingUi(false);
+    this._setMusicActivityHint(`${data.username || 'Someone'} paused playback.`);
+  } else if (data.action === 'play') {
+    this._suppressMusicBroadcasts();
+    this._playMusicEmbed();
+    this._setMusicPlayingUi(true);
+    this._setMusicActivityHint(`${data.username || 'Someone'} resumed playback.`);
+  } else if (data.action === 'next') {
+    this._suppressMusicBroadcasts();
+    this._musicNextTrack();
+  } else if (data.action === 'prev') {
+    this._suppressMusicBroadcasts();
+    this._musicPrevTrack();
+  } else if (data.action === 'shuffle') {
+    this._suppressMusicBroadcasts();
+    this._musicToggleShuffle();
+  }
+  if (data.syncState) this._applyMusicSyncState(data.syncState);
+},
+
+_handleMusicSeek(data) {
+  if (!data) return;
+  if (data.syncState) this._applyMusicSyncState(data.syncState);
+  else if (typeof data.positionSeconds === 'number') this._applyMusicSyncState({ positionSeconds: data.positionSeconds });
+  else if (typeof data.position === 'number') this._seekMusic(data.position);
+  if (data.username) this._setMusicActivityHint(`${data.username} seeked.`);
+},
+
+_toggleMusicPlayPause() {
+  this._suppressMusicBroadcasts();
+  if (this._musicPlaying) {
+    this._pauseMusicEmbed();
+    this._setMusicPlayingUi(false);
+    this._setMusicActivityHint('You paused playback.');
+  } else {
+    this._playMusicEmbed();
+    this._setMusicPlayingUi(true);
+    this._setMusicActivityHint('You resumed playback.');
+  }
+  this._emitMusicControl(this._musicPlaying ? 'play' : 'pause');
+},
+
+_musicTrackControl(action) {
+  if (action === 'next' && !this._musicSCWidget) {
+    this._emitMusicFinished(true);
+    return;
+  }
+  this._suppressMusicBroadcasts();
+  if (action === 'next') this._musicNextTrack();
+  else if (action === 'prev') this._musicPrevTrack();
+  else if (action === 'shuffle') this._musicToggleShuffle();
+  if (this.voice && this.voice.inVoice) {
+    this.socket.emit('music-control', { code: this.voice.currentChannel, action });
+  }
+},
+
+_musicNextTrack() {
+  try {
+    if (this._musicYTPlayer && this._musicYTPlayer.nextVideo) {
+      this._musicYTPlayer.nextVideo();
+    } else if (this._musicSCWidget) {
+      this._musicSCWidget.next();
+    }
+  } catch { /* player may not support next */ }
+},
+
+_musicPrevTrack() {
+  try {
+    if (this._musicYTPlayer && this._musicYTPlayer.previousVideo) {
+      this._musicYTPlayer.previousVideo();
+    } else if (this._musicSCWidget) {
+      this._musicSCWidget.prev();
+    }
+  } catch { /* player may not support prev */ }
+},
+
+_musicToggleShuffle() {
+  try {
+    this._musicSCShuffle = !this._musicSCShuffle;
+    // YouTube has native shuffle support for playlists
+    if (this._musicYTPlayer && this._musicYTPlayer.setShuffle) {
+      this._musicYTPlayer.setShuffle(this._musicSCShuffle);
+    }
+    // SoundCloud: immediately skip to a random track when shuffle is turned ON
+    if (this._musicSCShuffle && this._musicSCWidget && this._musicSCTrackCount > 1) {
+      let next = (this._musicSCCurrentIndex + 1) % this._musicSCTrackCount;
+      if (this._musicSCTrackCount > 2) {
+        next = Math.floor(Math.random() * (this._musicSCTrackCount - 1));
+        if (next >= this._musicSCCurrentIndex) next++;
+      }
+      this._musicSCCurrentIndex = next;
+      this._musicSCWidget.skip(next);
+    }
+    this._showToast(this._musicSCShuffle ? t('voice.shuffle_on') : t('voice.shuffle_off'), 'info');
+  } catch { /* player may not support shuffle */ }
+},
+
+_playMusicEmbed() {
+  try {
+    if (this._musicYTPlayer && this._musicYTPlayer.playVideo) {
+      this._musicYTPlayer.playVideo();
+    } else if (this._musicSCWidget) {
+      this._musicSCWidget.play();
+    } else {
+      // Spotify or fallback — restore paused src to resume
+      const iframe = document.getElementById('music-iframe');
+      if (iframe) {
+        const src = iframe.dataset.pausedSrc || iframe.src;
+        delete iframe.dataset.pausedSrc;
+        if (src && src !== 'about:blank') iframe.src = src;
+      }
+    }
+  } catch { /* player may be destroyed */ }
+},
+
+_pauseMusicEmbed() {
+  try {
+    if (this._musicYTPlayer && this._musicYTPlayer.pauseVideo) {
+      this._musicYTPlayer.pauseVideo();
+    } else if (this._musicSCWidget) {
+      this._musicSCWidget.pause();
+    } else {
+      // Spotify — no external API; remove src to pause, store for resume
+      const iframe = document.getElementById('music-iframe');
+      if (iframe) {
+        iframe.dataset.pausedSrc = iframe.src;
+        iframe.src = 'about:blank';
+      }
+    }
+  } catch { /* player may be destroyed */ }
+},
+
+_hideMusicPanel() {
+  this._stopMusicTimeTracking();
+  // Clean up PiP overlay if active
+  if (this._musicPip) {
+    this._musicPip.remove();
+    this._musicPip = null;
+  }
+  const panel = document.getElementById('music-panel');
+  if (panel) {
+    document.getElementById('music-embed-container').innerHTML = '';
+    panel.style.display = 'none';
+  }
+  this._removeMusicIndicator();
+  this._musicActive = false;
+  this._pendingMusicSyncState = null;
+  this._musicTrackId = null;
+  this._musicRequestorId = null;
+},
+
+_minimizeMusicPanel() {
+  document.getElementById('music-panel').style.display = 'none';
+  // Show an indicator in the channel header so user can reopen
+  if (this._musicActive) {
+    this._showMusicIndicator();
+  }
+},
+
+_popOutMusicPlayer() {
+  const panel = document.getElementById('music-panel');
+  const container = document.getElementById('music-embed-container');
+  if (!container || !container.innerHTML.trim()) {
+    this._showToast(t('toasts.no_music_playing'), 'error');
+    return;
+  }
+
+  // If already in PiP overlay, pop back in
+  if (this._musicPip) {
+    this._popInMusicPlayer();
+    return;
+  }
+  //PiP changes look larger than reality because of indentation changes from wrapping
+  this._captureCurrentMusicSyncState((syncState) => {
+    // Create floating PiP overlay
+    const pip = document.createElement('div');
+    pip.id = 'music-pip-overlay';
+    pip.className = 'music-pip-overlay';
+
+    const volume = parseInt(document.getElementById('music-volume-slider')?.value ?? '80');
+    const platform = this._musicPlatform || 'Music';
+    const playing = this._musicPlaying;
+
+    const savedOpacity = parseInt(localStorage.getItem('haven_pip_opacity') ?? '100');
+
+    pip.innerHTML = `
+      <div class="music-pip-header" id="music-pip-drag">
+        <button class="music-pip-btn" id="music-pip-popin" title="Minimize (back to panel)">─</button>
+        <div class="music-pip-copy">
+          <span class="music-pip-label">🎵 ${platform}</span>
+          <span class="music-up-next music-pip-up-next" id="music-pip-up-next">Up next: Nothing queued</span>
+        </div>
+        <span class="music-activity-hint" id="music-pip-activity-hint"></span>
+        <button class="music-pip-btn" id="music-pip-queue-btn" title="Queue">☰</button>
+        <button class="music-pip-btn" id="music-pip-fullscreen" title="Fullscreen">⤢</button>
+        <button class="music-pip-btn" id="music-pip-close" title="Close / stop music">✕</button>
+      </div>
+      <div class="music-pip-embed" id="music-pip-embed"></div>
+      <div class="music-pip-controls">
+        <button class="music-pip-btn" id="music-pip-pp" title="Play/Pause">${playing ? '⏸' : '▶'}</button>
+        <span class="music-pip-vol-icon" id="music-pip-mute" title="Mute">🔊</span>
+        <input type="range" class="music-pip-vol" id="music-pip-vol" min="0" max="100" value="${volume}">
+        <span class="pip-opacity-divider"></span>
+        <span class="music-pip-vol-icon" id="music-pip-opacity-icon" title="Window opacity">👁</span>
+        <input type="range" class="music-pip-vol pip-opacity-slider" id="music-pip-opacity" min="20" max="100" value="${savedOpacity}">
+      </div>
+    `;
+
+    pip.style.opacity = savedOpacity / 100;
+
+    document.body.appendChild(pip);
+    this._syncMusicQueueUi();
+    this._applyMusicControlPermissions();
+
+    // Move the embed wrapper (with live iframe) into the PiP overlay — no reload!
+    const embedWrapper = container.querySelector('.music-embed-wrapper');
+    if (embedWrapper) {
+      // Remove the click-blocking overlay so user can interact directly in PiP
+      const overlay = embedWrapper.querySelector('.music-embed-overlay');
+      if (overlay) overlay.style.display = 'none';
+      document.getElementById('music-pip-embed').appendChild(embedWrapper);
+    }
+
+    // Hide the original panel
+    panel.style.display = 'none';
+    this._showMusicIndicator();
+    this._musicPip = pip;
+    this._restoreMusicSyncStateAfterMove(syncState);
+
+    // Update popout button icon to show "pop-in"
+    const popBtn = document.getElementById('music-popout-btn');
+    if (popBtn) { popBtn.textContent = '⧈'; popBtn.title = 'Pop back in'; }
+
+    // ── PiP controls ──
+    document.getElementById('music-pip-popin').addEventListener('click', () => this._popInMusicPlayer());
+    document.getElementById('music-pip-queue-btn').addEventListener('click', () => this._openMusicQueueModal());
+    document.getElementById('music-pip-close').addEventListener('click', () => this._stopMusic());
+    document.getElementById('music-pip-pp').addEventListener('click', () => {
+      this._toggleMusicPlayPause();
+      document.getElementById('music-pip-pp').textContent = this._musicPlaying ? '⏸' : '▶';
+    });
+    document.getElementById('music-pip-vol').addEventListener('input', (e) => {
+      this._setMusicVolume(parseInt(e.target.value));
+      document.getElementById('music-pip-mute').textContent = parseInt(e.target.value) === 0 ? '🔇' : '🔊';
+    });
+    document.getElementById('music-pip-mute').addEventListener('click', () => {
+      this._toggleMusicMute();
+      const v = parseInt(document.getElementById('music-volume-slider')?.value ?? '0');
+      document.getElementById('music-pip-vol').value = v;
+      document.getElementById('music-pip-mute').textContent = v === 0 ? '🔇' : '🔊';
+    });
+
+    // ── Opacity ──
+    document.getElementById('music-pip-opacity').addEventListener('input', (e) => {
+      const val = parseInt(e.target.value);
+      pip.style.opacity = val / 100;
+      localStorage.setItem('haven_pip_opacity', val);
+    });
+
+    // ── Fullscreen ──
+    const toggleMusicFS = () => {
+      const el = pip;
+      if (document.fullscreenElement === el) {
+        document.exitFullscreen().catch(() => {});
+      } else {
+        (el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen).call(el).catch(() => {});
+      }
+    };
+    document.getElementById('music-pip-fullscreen').addEventListener('click', toggleMusicFS);
+    document.getElementById('music-pip-embed').addEventListener('dblclick', toggleMusicFS);
+    document.addEventListener('fullscreenchange', () => {
+      const fsBtn = document.getElementById('music-pip-fullscreen');
+      if (!fsBtn) return;
+      if (document.fullscreenElement === pip) {
+        fsBtn.textContent = '⤡'; fsBtn.title = 'Exit fullscreen';
+      } else {
+        fsBtn.textContent = '⤢'; fsBtn.title = 'Fullscreen';
+      }
+    });
+
+    // ── Dragging ──
+    this._initPipDrag(pip, document.getElementById('music-pip-drag'));
+  });
+},
+
+_popInMusicPlayer() {
+  const pip = this._musicPip;
+  if (!pip) return;
+
+  this._captureCurrentMusicSyncState((syncState) => {
+    const container = document.getElementById('music-embed-container');
+    const panel = document.getElementById('music-panel');
+
+    // Move embed wrapper back to the panel
+    const embedWrapper = pip.querySelector('.music-embed-wrapper');
+    if (embedWrapper && container) {
+      // Re-add the click-blocking overlay
+      const overlay = embedWrapper.querySelector('.music-embed-overlay');
+      if (overlay) overlay.style.display = '';
+      container.appendChild(embedWrapper);
+    }
+
+    pip.remove();
+    this._musicPip = null;
+
+    // Restore panel
+    if (this._musicActive && panel) {
+      panel.style.display = 'flex';
+      this._removeMusicIndicator();
+    }
+
+    this._restoreMusicSyncStateAfterMove(syncState);
+
+    // Restore popout button icon
+    const popBtn = document.getElementById('music-popout-btn');
+    if (popBtn) { popBtn.textContent = '⧉'; popBtn.title = t('media.music_popout'); }
+  });
+},
+
+_initPipDrag(pip, handle) {
+  let dragging = false, startX, startY, origX, origY;
+  handle.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button')) return; // don't interfere with button clicks
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    const rect = pip.getBoundingClientRect();
+    origX = rect.left; origY = rect.top;
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    pip.style.left = (origX + e.clientX - startX) + 'px';
+    pip.style.top = (origY + e.clientY - startY) + 'px';
+    pip.style.right = 'auto';
+    pip.style.bottom = 'auto';
+  });
+  document.addEventListener('mouseup', () => { dragging = false; });
+  // Touch support
+  handle.addEventListener('touchstart', (e) => {
+    dragging = true;
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+    const rect = pip.getBoundingClientRect();
+    origX = rect.left; origY = rect.top;
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    const t = e.touches[0];
+    pip.style.left = (origX + t.clientX - startX) + 'px';
+    pip.style.top = (origY + t.clientY - startY) + 'px';
+    pip.style.right = 'auto';
+    pip.style.bottom = 'auto';
+  }, { passive: true });
+  document.addEventListener('touchend', () => { dragging = false; });
+},
+
+  _showMusicIndicator() {
+    let ind = document.getElementById('music-indicator');
+    if (ind) return; // already showing
+    ind = document.createElement('button');
+    ind.id = 'music-indicator';
+    ind.className = 'music-indicator';
+    ind.textContent = `🎵 ${t('voice.music_playing')}`;
+    ind.title = t('voice.music_show_player');
+    ind.addEventListener('click', () => {
+      // If PiP is active, pop back in first
+      if (this._musicPip) {
+        this._popInMusicPlayer();
+        return;
+      }
+      const panel = document.getElementById('music-panel');
+      panel.style.display = 'flex';
+      ind.remove();
+    });
+    // Append inside voice-controls so it groups with other header buttons
+    document.querySelector('.voice-controls')?.appendChild(ind);
+  },
+
+_removeMusicIndicator() {
+  document.getElementById('music-indicator')?.remove();
+},
+
+_setMusicVolume(vol) {
+  localStorage.setItem('haven_music_volume', vol);
+  const muteBtn = document.getElementById('music-mute-btn');
+  if (muteBtn) muteBtn.textContent = vol === 0 ? '🔇' : '🔊';
+  // Apply to active player
+  try {
+    if (this._musicYTPlayer && this._musicYTPlayer.setVolume) {
+      this._musicYTPlayer.setVolume(vol);
+    } else if (this._musicSCWidget) {
+      this._musicSCWidget.setVolume(vol);
+    }
+  } catch { /* player may be gone */ }
+},
+
+_toggleMusicMute() {
+  const slider = document.getElementById('music-volume-slider');
+  const muteBtn = document.getElementById('music-mute-btn');
+  if (!slider) return;
+  if (parseInt(slider.value) > 0) {
+    slider.dataset.prevValue = slider.value;
+    slider.value = 0;
+    muteBtn.textContent = '🔇';
+  } else {
+    slider.value = slider.dataset.prevValue || 80;
+    muteBtn.textContent = '🔊';
+  }
+  this._setMusicVolume(parseInt(slider.value));
+},
+
+// ── Seek bar & time tracking ──────────────────────────
+_seekMusic(pct) {
+  try {
+    if (this._musicYTPlayer && this._musicYTPlayer.getDuration) {
+      const dur = this._musicYTPlayer.getDuration();
+      if (dur > 0) this._seekMusicToSeconds(dur * pct / 100);
+    } else if (this._musicSCWidget) {
+      this._musicSCWidget.getDuration((dur) => {
+        if (dur > 0) this._seekMusicToSeconds((dur / 1000) * pct / 100);
+      });
+    }
+  } catch { /* player may be gone */ }
+},
+
+_startMusicTimeTracking() {
+  this._stopMusicTimeTracking();
+  const seekSlider = document.getElementById('music-seek-slider');
+  const curEl = document.getElementById('music-time-current');
+  const durEl = document.getElementById('music-time-duration');
+  const fmt = (s) => { const m = Math.floor(s / 60); return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`; };
+
+  this._musicTimeInterval = setInterval(() => {
+    try {
+      if (this._musicYTPlayer && this._musicYTPlayer.getCurrentTime && this._musicYTPlayer.getDuration) {
+        const cur = this._musicYTPlayer.getCurrentTime() || 0;
+        const dur = this._musicYTPlayer.getDuration() || 0;
+        const now = Date.now();
+        if (curEl) curEl.textContent = fmt(cur);
+        if (durEl) durEl.textContent = fmt(dur);
+        if (seekSlider && !this._musicSeeking && dur > 0) seekSlider.value = (cur / dur * 100).toFixed(1);
+        if (this._musicLastTrackedPosition != null && !this._shouldSuppressMusicBroadcasts()) {
+          const elapsed = this._musicPlaying ? (now - (this._musicLastTrackedAt || now)) / 1000 : 0;
+          const expected = this._musicLastTrackedPosition + Math.max(0, elapsed);
+          if (Math.abs(cur - expected) > 2 && now - (this._musicLastSeekBroadcastAt || 0) > 1200) {
+            this._emitMusicSeek(cur, dur);
+          }
+        }
+        this._musicLastTrackedPosition = cur;
+        this._musicLastTrackedAt = now;
+      } else if (this._musicSCWidget) {
+        this._musicSCWidget.getPosition((pos) => {
+          this._musicSCWidget.getDuration((dur) => {
+            const curS = (pos || 0) / 1000;
+            const durS = (dur || 0) / 1000;
+            const now = Date.now();
+            if (curEl) curEl.textContent = fmt(curS);
+            if (durEl) durEl.textContent = fmt(durS);
+            if (seekSlider && !this._musicSeeking && durS > 0) seekSlider.value = (curS / durS * 100).toFixed(1);
+            if (this._musicLastTrackedPosition != null && !this._shouldSuppressMusicBroadcasts()) {
+              const elapsed = this._musicPlaying ? (now - (this._musicLastTrackedAt || now)) / 1000 : 0;
+              const expected = this._musicLastTrackedPosition + Math.max(0, elapsed);
+              if (Math.abs(curS - expected) > 2 && now - (this._musicLastSeekBroadcastAt || 0) > 1200) {
+                this._emitMusicSeek(curS, durS);
+              }
+            }
+            this._musicLastTrackedPosition = curS;
+            this._musicLastTrackedAt = now;
+          });
+        });
+      }
+    } catch { /* player gone */ }
+  }, 500);
+},
+
+_stopMusicTimeTracking() {
+  if (this._musicTimeInterval) { clearInterval(this._musicTimeInterval); this._musicTimeInterval = null; }
+  const seekSlider = document.getElementById('music-seek-slider');
+  const curEl = document.getElementById('music-time-current');
+  const durEl = document.getElementById('music-time-duration');
+  if (seekSlider) seekSlider.value = 0;
+  if (curEl) curEl.textContent = '0:00';
+  if (durEl) durEl.textContent = '0:00';
+  this._musicLastTrackedPosition = null;
+  this._musicLastTrackedAt = 0;
+},
+
+_getMusicEmbed(url) {
+  if (!url) return null;
+  const spotifyMatch = url.match(/open\.spotify\.com\/(track|album|playlist|episode|show)\/([a-zA-Z0-9]+)/);
+  if (spotifyMatch) return `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}?theme=0&utm_source=generator&autoplay=1`;
+  const ytMusicMatch = url.match(/music\.youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/);
+  if (ytMusicMatch) return `https://www.youtube-nocookie.com/embed/${ytMusicMatch[1]}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}&rel=0`;
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+  if (ytMatch) return `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}&rel=0`;
+  if (url.includes('soundcloud.com/')) {
+    return `https://w.soundcloud.com/player/?url=${encodeURIComponent(url)}&color=%23ff5500&auto_play=true&hide_related=true&show_comments=false&show_user=true&show_reposts=false&show_teaser=false&visual=false`;
+  }
+  return null;
+},
+
+_getMusicPlatform(url) {
+  if (!url) return null;
+  if (url.includes('spotify.com')) return { name: 'Spotify', icon: '🟢' };
+  if (url.includes('music.youtube.com')) return { name: 'YouTube Music', icon: '🔴' };
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return { name: 'YouTube', icon: '🔴' };
+  if (url.includes('soundcloud.com')) return { name: 'SoundCloud', icon: '🟠' };
+  return null;
+},
+
+// ── Active-speaker rings on the face-to-face grid ─────────
+// Reads the mic audio the VoiceManager already holds (localStream + each
+// peer.stream) and toggles a `.speaking` class on the matching webcam tile.
+// It only *observes* levels — it never routes audio to the speakers, so there
+// is no echo — and it tears itself down when the last camera tile disappears.
+_ensureSpeakingMonitor() {
+  if (this._speakTimer) return;
+  // Active-speaker cue driven by the voice engine's canonical talking signal
+  // (talkingState), so a person's webcam-tile ring and their sidebar voice-list
+  // dot light together. Covers real camera tiles, camera-off presence tiles and
+  // the voice participant list. Self-stops when there is nothing to show.
+  const paint = () => {
+    const ts = this.voice && this.voice.talkingState;
+    const selfId = this.user && this.user.id;
+    const talks = (uid) => {
+      if (!ts) return false;
+      if (uid === 'self' || uid === String(selfId)) return !!ts.get('self') || !!ts.get(selfId);
+      return !!ts.get(uid) || !!ts.get(Number(uid));
+    };
+    const tiles = document.querySelectorAll('.webcam-tile');
+    tiles.forEach((tile) => {
+      const uid = tile.id.replace(/^webcam-(?:tile|presence)-/, '');
+      tile.classList.toggle('speaking', talks(uid));
+    });
+    document.querySelectorAll('.voice-user-item[data-user-id]').forEach((it) => {
+      it.classList.toggle('talking', talks(it.getAttribute('data-user-id')));
+    });
+    const inVoice = !!(this.voice && (this.voice.inVoice || this.voice.currentChannel));
+    if (tiles.length === 0 && !inVoice) this._stopSpeakingMonitor();
+  };
+  this._speakTimer = setInterval(paint, 150);
+  paint();
+},
+
+_stopSpeakingMonitor() {
+  if (this._speakTimer) { clearInterval(this._speakTimer); this._speakTimer = null; }
+  document.querySelectorAll('.webcam-tile.speaking').forEach((t) => t.classList.remove('speaking'));
+  document.querySelectorAll('.voice-user-item.talking').forEach((t) => t.classList.remove('talking'));
+},
+
+// ── Camera-off presence tiles + mute badges (Tier 1) ──────
+// Idempotent reconcile from the current voice roster. Presence (avatar) tiles
+// appear only once the face-to-face grid is already up (>=1 real camera), so a
+// voice-only call stays uncluttered. Safe to call on any voice/webcam change.
+_syncWebcamTiles() {
+  const grid = document.getElementById('webcam-grid');
+  const container = document.getElementById('webcam-container');
+  if (!grid || !container) return;
+
+  const inVoice = !!(this.voice && this.voice.currentChannel);
+  const gridUp = container.style.display !== 'none'
+    && !!grid.querySelector('.webcam-tile:not(.webcam-presence)');
+
+  // roster + per-user mute map
+  const code = this.voice && this.voice.currentChannel;
+  let roster = [];
+  if (inVoice) {
+    if (Array.isArray(this._lastVoiceUsers) && this._lastVoiceUsersChannel === code) roster = this._lastVoiceUsers;
+    else if (this.voiceChannelUsers && this.voiceChannelUsers[code]) roster = this.voiceChannelUsers[code];
+  }
+  const muteOf = new Map();
+  for (const u of roster) if (u && u.id != null) muteOf.set(String(u.id), !!u.isMuted);
+  if (this.user && this.voice) muteOf.set(String(this.user.id), !!this.voice.isMuted);
+
+  const camOn = (id) => !!(this.voice && this.voice.webcamUsers &&
+    (this.voice.webcamUsers.has(id) || this.voice.webcamUsers.has(Number(id)) || this.voice.webcamUsers.has(String(id))));
+
+  // 1) presence tiles for in-voice users who are NOT sharing a camera
+  const wanted = new Set();
+  if (gridUp && inVoice) {
+    for (const u of roster) {
+      if (!u || u.id == null) continue;
+      const idStr = String(u.id);
+      if (document.getElementById(`webcam-tile-${u.id}`)) continue;   // already has a real camera tile
+      if (camOn(u.id)) continue;
+      wanted.add(idStr);
+      let tile = document.getElementById(`webcam-presence-${u.id}`);
+      if (!tile) { tile = this._buildPresenceTile(u); grid.appendChild(tile); }
+      this._setTileMuted(tile, muteOf.get(idStr));
+    }
+  }
+  grid.querySelectorAll('.webcam-tile.webcam-presence').forEach((t) => {
+    const uid = t.id.replace('webcam-presence-', '');
+    if (!wanted.has(uid)) t.remove();
+  });
+
+  // 2) mute badges on the real camera tiles
+  grid.querySelectorAll('.webcam-tile:not(.webcam-presence)').forEach((t) => {
+    const uid = t.id.replace('webcam-tile-', '');
+    const isSelf = uid === 'self' || uid === String(this.user && this.user.id);
+    const muted = isSelf ? !!(this.voice && this.voice.isMuted) : muteOf.get(uid);
+    this._setTileMuted(t, muted);
+  });
+},
+
+_buildPresenceTile(u) {
+  const tile = document.createElement('div');
+  tile.id = `webcam-presence-${u.id}`;
+  tile.className = 'webcam-tile webcam-presence';
+  tile.setAttribute('role', 'group');
+  const name = u.username || 'Someone';
+  tile.setAttribute('aria-label', name + ' (camera off)');
+  const initial = this._escapeHtml((String(name).trim()[0] || '?').toUpperCase());
+  const color = (this._safeColor && this._safeColor(u.roleColor)) || '';
+  const avatar = u.avatar
+    ? `<img class="webcam-presence-avatar" src="${this._escapeHtml(u.avatar)}" alt="">`
+    : `<div class="webcam-presence-avatar webcam-presence-initial"${color ? ` style="background:${color}"` : ''}>${initial}</div>`;
+  tile.innerHTML =
+    `<div class="webcam-presence-body">${avatar}</div>` +
+    `<div class="webcam-tile-label">${this._escapeHtml(name)}</div>` +
+    `<span class="webcam-mute-badge" title="Muted" hidden>\ud83d\udd07</span>`;
+  return tile;
+},
+
+_setTileMuted(tile, muted) {
+  if (!tile) return;
+  let badge = tile.querySelector('.webcam-mute-badge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'webcam-mute-badge';
+    badge.title = 'Muted';
+    badge.textContent = '\ud83d\udd07';
+    badge.hidden = true;
+    tile.appendChild(badge);
+  }
+  badge.hidden = !muted;
+  tile.classList.toggle('is-muted', !!muted);
+},
+
+_toggleWebcamPin(tile) {
+  const grid = document.getElementById('webcam-grid');
+  const container = document.getElementById('webcam-container');
+  if (!grid || !container || !tile) return;
+  const wasPinned = tile.classList.contains('webcam-pinned');
+  grid.querySelectorAll('.webcam-tile.webcam-pinned').forEach((t) => {
+    t.classList.remove('webcam-pinned');
+    const b = t.querySelector('.stream-pin-btn'); if (b) { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); }
+  });
+  if (!wasPinned) {
+    // Entering spotlight — suspend the gallery layout so spotlight owns the grid
+    // cleanly (no CSS specificity fight); remember it to restore on unpin.
+    if (!container.classList.contains('webcam-spotlight-mode')) {
+      this._preSpotlightGallery = container.classList.contains('webcam-gallery-mode');
+      container.classList.remove('webcam-gallery-mode');
+      grid.classList.remove('layout-gallery');
+    }
+    tile.classList.add('webcam-pinned');
+    container.classList.add('webcam-spotlight-mode');
+    const b = tile.querySelector('.stream-pin-btn'); if (b) { b.classList.add('active'); b.setAttribute('aria-pressed', 'true'); }
+  } else {
+    container.classList.remove('webcam-spotlight-mode');
+    if (this._preSpotlightGallery) {
+      container.classList.add('webcam-gallery-mode');
+      grid.classList.add('layout-gallery');
+    }
+    this._preSpotlightGallery = false;
+  }
+},
+
+// ── Connection-quality dots (Tier 2 item 5) ──────────────
+// Polls each peer's RTCPeerConnection.getStats() and shows a 3-bar signal on
+// their tile (good / ok / poor) from packet loss + round-trip time. Read-only.
+_startQualityMonitor() {
+  if (this._qualTimer) return;
+  const run = async () => {
+    const tiles = document.querySelectorAll('.webcam-tile');
+    const inVoice = !!(this.voice && (this.voice.inVoice || this.voice.currentChannel));
+    if (tiles.length === 0 && !inVoice) { this._stopQualityMonitor(); return; }
+    const peers = this.voice && this.voice.peers;
+    for (const tile of tiles) {
+      const uid = tile.id.replace(/^webcam-(?:tile|presence)-/, '');
+      if (uid === 'self' || uid === String(this.user && this.user.id)) {
+        const q = tile.querySelector('.webcam-quality'); if (q) q.remove();   // no self RTT
+        continue;
+      }
+      const peer = peers && (peers.get(uid) || peers.get(Number(uid)));
+      const pc = peer && peer.connection;
+      if (!pc || typeof pc.getStats !== 'function') continue;
+      try {
+        const stats = await pc.getStats();
+        let lost = 0, recv = 0, rtt = null;
+        stats.forEach((r) => {
+          if (r.type === 'inbound-rtp' && !r.isRemote) { lost += r.packetsLost || 0; recv += r.packetsReceived || 0; }
+          if (r.type === 'candidate-pair' && (r.nominated || r.state === 'succeeded') && typeof r.currentRoundTripTime === 'number') rtt = r.currentRoundTripTime;
+        });
+        const loss = (lost + recv) > 0 ? lost / (lost + recv) : 0;
+        let level = 'good';
+        if (loss > 0.05 || (rtt != null && rtt > 0.4)) level = 'poor';
+        else if (loss > 0.01 || (rtt != null && rtt > 0.2)) level = 'ok';
+        const title = `${t('media.connection') || 'Connection'}: ${(loss * 100).toFixed(1)}% loss${rtt != null ? ` · ${Math.round(rtt * 1000)}ms` : ''}`;
+        this._setTileQuality(tile, level, title);
+      } catch {}
+    }
+    this._qualTimer = setTimeout(run, 2000);
+  };
+  this._qualTimer = setTimeout(run, 800);
+},
+
+_stopQualityMonitor() {
+  if (this._qualTimer) { clearTimeout(this._qualTimer); this._qualTimer = null; }
+  document.querySelectorAll('.webcam-quality').forEach((q) => q.remove());
+},
+
+_setTileQuality(tile, level, title) {
+  if (!tile) return;
+  let q = tile.querySelector('.webcam-quality');
+  if (!q) {
+    q = document.createElement('span');
+    q.className = 'webcam-quality';
+    q.innerHTML = '<i></i><i></i><i></i>';
+    tile.appendChild(q);
+  }
+  q.className = 'webcam-quality q-' + level;
+  q.title = title || '';
+},
+
+_setTileReconnecting(tile, on) {
+  if (!tile || tile.classList.contains('webcam-presence')) return;   // presence tiles have no video
+  let ov = tile.querySelector('.webcam-reconnecting');
+  if (on) {
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.className = 'webcam-reconnecting';
+      ov.setAttribute('role', 'status');
+      ov.innerHTML = '<span class="webcam-reconnecting-spin" aria-hidden="true"></span>'
+        + '<span class="webcam-reconnecting-text"></span>';
+      ov.querySelector('.webcam-reconnecting-text').textContent = t('media.reconnecting') || 'Reconnecting…';
+      tile.appendChild(ov);
+    }
+  } else if (ov) {
+    ov.remove();
+  }
+},
+
+
+};

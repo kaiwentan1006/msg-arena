@@ -1,0 +1,48 @@
+apiVersion: zeabur.com/v1
+kind: Template
+metadata:
+  name: MSG Arena
+spec:
+  description: "Self-hosted private chat — your server, your rules. No cloud. No tracking. Free forever."
+  icon: https://raw.githubusercontent.com/ancsemi/Haven/main/Haven-Desktop/assets/icon.png
+  tags:
+    - Chat
+    - Self-hosted
+    - Communication
+  variables:
+    - key: HAVEN_DOMAIN
+      type: DOMAIN
+      name: Domain
+      description: What domain do you want for your MSG Arena server?
+  readme: |-
+    # MSG Arena — Private Chat
+
+    Self-hosted Discord alternative. Run it on your own infrastructure.
+    Register with username `admin` to become the server owner.
+
+    **Data persists** in the `/data` volume (database, uploads, certs, config).
+  services:
+    - name: MSG Arena
+      template: PREBUILT
+      domainKey: HAVEN_DOMAIN
+      spec:
+        source:
+          image: ghcr.io/ancsemi/haven:latest
+        ports:
+          - id: web
+            port: 3000
+            type: HTTP
+        volumes:
+          - id: data
+            dir: /data
+        env:
+          PORT:
+            default: "3000"
+          HOST:
+            default: "0.0.0.0"
+          NODE_ENV:
+            default: "production"
+          HAVEN_DATA_DIR:
+            default: "/data"
+          FORCE_HTTP:
+            default: "true"

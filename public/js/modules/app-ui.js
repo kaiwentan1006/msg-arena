@@ -1,0 +1,7180 @@
+export default {
+
+// ── UI Event Bindings ─────────────────────────────────
+
+// Shared keydown handler for any input that supports @mention / :emoji /
+// /slash autocomplete. Returns true if the event was consumed. (#5296)
+_handleAutocompleteKeydown(e) {
+  const emojiDd = document.getElementById('emoji-dropdown');
+  if (emojiDd && emojiDd.style.display !== 'none') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._navigateEmojiDropdown(e.key === 'ArrowDown' ? 1 : -1);
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      const active = emojiDd.querySelector('.emoji-ac-item.active');
+      if (active) { e.preventDefault(); active.click(); return true; }
+    }
+    if (e.key === 'Escape') { this._hideEmojiDropdown(); return true; }
+  }
+  const slashDd = document.getElementById('slash-dropdown');
+  if (slashDd && slashDd.style.display !== 'none') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._navigateSlashDropdown(e.key === 'ArrowDown' ? 1 : -1);
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      const active = slashDd.querySelector('.slash-item.active');
+      if (active) { e.preventDefault(); active.click(); return true; }
+    }
+    if (e.key === 'Escape') { this._hideSlashDropdown(); return true; }
+  }
+  const dropdown = document.getElementById('mention-dropdown');
+  if (dropdown && dropdown.style.display !== 'none') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._navigateMentionDropdown(e.key === 'ArrowDown' ? 1 : -1);
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      const active = dropdown.querySelector('.mention-item.active');
+      if (active) { e.preventDefault(); active.click(); return true; }
+    }
+    if (e.key === 'Escape') { this._hideMentionDropdown(); return true; }
+  }
+  const channelDd = document.getElementById('channel-dropdown');
+  if (channelDd && channelDd.style.display !== 'none') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._navigateChannelDropdown(e.key === 'ArrowDown' ? 1 : -1);
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      const active = channelDd.querySelector('.mention-item.active');
+      if (active) { e.preventDefault(); active.click(); return true; }
+    }
+    if (e.key === 'Escape') { this._hideChannelDropdown(); return true; }
+  }
+  const personaDd = document.getElementById('persona-dropdown');
+  if (personaDd && personaDd.style.display !== 'none') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._navigatePersonaDropdown(e.key === 'ArrowDown' ? 1 : -1);
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      const active = personaDd.querySelector('.mention-item.active');
+      if (active) { e.preventDefault(); active.click(); return true; }
+    }
+    if (e.key === 'Escape') { this._hidePersonaDropdown(); return true; }
+  }
+  const ferryDd = document.getElementById('ferry-dropdown');
+  if (ferryDd && ferryDd.style.display !== 'none') {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._navigateFerryDropdown(e.key === 'ArrowDown' ? 1 : -1);
+      return true;
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      const active = ferryDd.querySelector('.mention-item.active');
+      if (active) { e.preventDefault(); active.click(); return true; }
+    }
+    if (e.key === 'Escape') { this._hideFerryDropdown(); return true; }
+  }
+  return false;
+},
+
+_setupUI() {
+  const msgInput = document.getElementById('message-input');
+
+  // Shorter placeholder on narrow screens to prevent wrapping
+  if (window.innerWidth <= 480) {
+    msgInput.placeholder = t('app.messages.placeholder_short');
+  }
+
+  msgInput.addEventListener('keydown', (e) => {
+    // If emoji dropdown is visible, hijack arrow keys, enter, tab, escape
+    const emojiDd = document.getElementById('emoji-dropdown');
+    if (emojiDd && emojiDd.style.display !== 'none') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._navigateEmojiDropdown(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const active = emojiDd.querySelector('.emoji-ac-item.active');
+        if (active) { e.preventDefault(); active.click(); return; }
+      }
+      if (e.key === 'Escape') { this._hideEmojiDropdown(); return; }
+    }
+
+    // If slash dropdown is visible, hijack arrow keys and enter
+    const slashDd = document.getElementById('slash-dropdown');
+    if (slashDd && slashDd.style.display !== 'none') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._navigateSlashDropdown(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const active = slashDd.querySelector('.slash-item.active');
+        if (active) { e.preventDefault(); active.click(); return; }
+      }
+      if (e.key === 'Escape') { this._hideSlashDropdown(); return; }
+    }
+
+    // If mention dropdown is visible, hijack arrow keys and enter
+    const dropdown = document.getElementById('mention-dropdown');
+    if (dropdown && dropdown.style.display !== 'none') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._navigateMentionDropdown(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const active = dropdown.querySelector('.mention-item.active');
+        if (active) {
+          e.preventDefault();
+          active.click();
+          return;
+        }
+      }
+      if (e.key === 'Escape') {
+        this._hideMentionDropdown();
+        return;
+      }
+    }
+
+    // If channel dropdown is visible, hijack arrow keys and enter
+    const channelDd = document.getElementById('channel-dropdown');
+    if (channelDd && channelDd.style.display !== 'none') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._navigateChannelDropdown(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const active = channelDd.querySelector('.mention-item.active');
+        if (active) { e.preventDefault(); active.click(); return; }
+      }
+      if (e.key === 'Escape') { this._hideChannelDropdown(); return; }
+    }
+
+    // If persona dropdown is visible, hijack arrow keys and enter (#5349)
+    const personaDd = document.getElementById('persona-dropdown');
+    if (personaDd && personaDd.style.display !== 'none') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._navigatePersonaDropdown(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const active = personaDd.querySelector('.mention-item.active');
+        if (active) { e.preventDefault(); active.click(); return; }
+      }
+      if (e.key === 'Escape') { this._hidePersonaDropdown(); return; }
+    }
+
+    // Ferry target dropdown takes the same keys as the persona one above.
+    const ferryDd = document.getElementById('ferry-dropdown');
+    if (ferryDd && ferryDd.style.display !== 'none') {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._navigateFerryDropdown(e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const active = ferryDd.querySelector('.mention-item.active');
+        if (active) { e.preventDefault(); active.click(); return; }
+      }
+      if (e.key === 'Escape') { this._hideFerryDropdown(); return; }
+    }
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      this._sendMessage();
+    }
+
+    // Up arrow on empty input → edit last own message (toggleable)
+    if (e.key === 'ArrowUp' && !msgInput.value && localStorage.getItem('haven_up_arrow_edit') !== 'false') {
+      const msgs = document.getElementById('messages');
+      const allMsgs = [...msgs.querySelectorAll('.message, .message-compact')];
+      for (let i = allMsgs.length - 1; i >= 0; i--) {
+        const el = allMsgs[i];
+        if (parseInt(el.dataset.userId) === this.user.id && !el.classList.contains('editing')) {
+          e.preventDefault();
+          this._startEditMessage(el, parseInt(el.dataset.msgId));
+          break;
+        }
+      }
+    }
+  });
+
+  msgInput.addEventListener('input', () => {
+    const maxH = window.innerWidth <= 480 ? 90 : 120;
+    msgInput.style.height = 'auto';
+    msgInput.style.height = Math.min(msgInput.scrollHeight, maxH) + 'px';
+
+    const now = Date.now();
+    if (now - this.lastTypingEmit > 2000 && this.currentChannel) {
+      this.socket.emit('typing', { code: this.currentChannel });
+      this.lastTypingEmit = now;
+    }
+
+    // Check for @mention trigger
+    this._checkMentionTrigger();
+    // Check for #channel trigger
+    this._checkChannelTrigger();
+    // Check for :emoji autocomplete trigger
+    this._checkEmojiTrigger();
+    // Check for /command trigger
+    this._checkSlashTrigger();
+    // Check for >>persona trigger (#86, #5349)
+    this._checkPersonaTrigger();
+    // Check for =>Discord ferry target trigger
+    this._checkFerryTrigger();
+  });
+
+  document.getElementById('send-btn').addEventListener('click', () => this._sendMessage());
+
+  // Join channel
+  const joinBtn = document.getElementById('join-channel-btn');
+  const codeInput = document.getElementById('channel-code-input');
+  joinBtn.addEventListener('click', () => {
+    const code = codeInput.value.trim();
+    if (code) { this.socket.emit('join-channel', { code }); codeInput.value = ''; }
+  });
+  codeInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') joinBtn.click(); });
+
+  // Create channel (admin)
+  const createBtn = document.getElementById('create-channel-btn');
+  const nameInput = document.getElementById('new-channel-name');
+  if (createBtn) {
+    createBtn.addEventListener('click', () => {
+      const name = nameInput.value.trim();
+      const isPrivate = document.getElementById('new-channel-private')?.checked || false;
+      const temporary = document.getElementById('new-channel-temporary')?.checked || false;
+      const duration = parseInt(document.getElementById('new-channel-duration')?.value, 10) || 24;
+      const addAllMembers = document.getElementById('new-channel-add-all')?.checked || false;
+      if (name) {
+        this.socket.emit('create-channel', { name, isPrivate, temporary, duration, addAllMembers });
+        nameInput.value = '';
+        const pvt = document.getElementById('new-channel-private');
+        if (pvt) pvt.checked = false;
+        const tmp = document.getElementById('new-channel-temporary');
+        if (tmp) tmp.checked = false;
+        const all = document.getElementById('new-channel-add-all');
+        if (all) all.checked = false;
+        const durRow = document.getElementById('temp-channel-duration-row');
+        if (durRow) durRow.style.display = 'none';
+      }
+    });
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') createBtn.click(); });
+  }
+
+  // Toggle temporary channel duration row
+  const tempCheckbox = document.getElementById('new-channel-temporary');
+  if (tempCheckbox) {
+    tempCheckbox.addEventListener('change', () => {
+      const durRow = document.getElementById('temp-channel-duration-row');
+      if (durRow) durRow.style.display = tempCheckbox.checked ? '' : 'none';
+    });
+  }
+
+  // Copy code
+  document.getElementById('copy-code-btn').addEventListener('click', () => {
+    if (this.currentChannel) {
+      const ch = this.channels.find(c => c.code === this.currentChannel);
+      const codeToCopy = ch && ch.display_code !== '••••••••' ? this.currentChannel : null;
+      if (codeToCopy) {
+        const onCopied = () => this._showToast(t('toasts.channel_code_copied'), 'success');
+        navigator.clipboard.writeText(codeToCopy).then(onCopied).catch(() => {
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = codeToCopy;
+            ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+            document.body.appendChild(ta);
+            ta.focus(); ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            onCopied();
+          } catch { /* could not copy */ }
+        });
+      }
+    }
+  });
+
+  // Delete channel
+  // ── Channel context menu ("..." on hover) ──────────
+  this._initChannelContextMenu();
+  this._initDmContextMenu();
+  // Delete channel — themed confirm (issue #5307: was using two chained native confirm() calls)
+  document.querySelector('[data-action="delete"]')?.addEventListener('click', async () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    const ok = await this._showConfirmModal(
+      '⚠️ ' + t('confirm.delete_channel'),
+      t('confirm.delete_channel_sure'),
+      { danger: true }
+    );
+    if (!ok) return;
+    this.socket.emit('delete-channel', { code });
+  });
+  // Mark channel as read
+  document.querySelector('#channel-ctx-menu [data-action="mark-read"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    this.unreadCounts[code] = 0;
+    this._updateBadge(code);
+    this.socket.emit('mark-read-channel', { code });
+  });
+  // Mute channel toggle
+  document.querySelector('#channel-ctx-menu [data-action="mute"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    const muted = JSON.parse(localStorage.getItem('haven_muted_channels') || '[]');
+    const idx = muted.indexOf(code);
+    const willBeMuted = idx < 0;
+    if (idx >= 0) { muted.splice(idx, 1); this._showToast(t('toasts.channel_unmuted'), 'success'); }
+    else { muted.push(code); this._showToast(t('toasts.channel_muted'), 'success'); }
+    localStorage.setItem('haven_muted_channels', JSON.stringify(muted));
+    this._syncChannelMutePref(code, willBeMuted);
+    this._renderChannels();
+  });
+  // Copy channel link from context menu
+  document.querySelector('#channel-ctx-menu [data-action="copy-channel-link"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    if (!this._canShareChannelLink?.(code)) {
+      this._closeChannelCtxMenu();
+      this._showToast?.(t('toasts.channel_link_unavailable') || 'Channel not available on this server', 'error');
+      return;
+    }
+    this._closeChannelCtxMenu();
+    this._copyChannelLink(code);
+  });
+  // Join voice from context menu
+  document.querySelector('[data-action="join-voice"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    // Switch to the channel first, then join voice
+    this.switchChannel(code);
+    setTimeout(() => this._joinVoice(), 300);
+  });
+  // Leave channel
+  document.querySelector('[data-action="leave-channel"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    const ch = this.channels.find(c => c.code === code);
+    const name = ch ? ch.name : code;
+    if (!confirm(t('confirm.leave_channel', { name }))) return;
+    this.socket.emit('leave-channel', { code }, (res) => {
+      if (res && res.error) { this._showToast(res.error, 'error'); return; }
+      this._showToast(t('toasts.left_channel', { name }), 'success');
+      // Switch to another channel if we're currently in this one
+      if (this.currentChannel === code) {
+        const remaining = this.channels.filter(c => c.code !== code && !c.is_dm);
+        if (remaining.length) this.switchChannel(remaining[0].code);
+      }
+    });
+  });
+  // Hide channel (admin declutter — local only, channel stays accessible) (#5409)
+  document.querySelector('[data-action="hide-channel"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    this._hideChannel(code);
+  });
+  // Disconnect from voice via context menu
+  document.querySelector('[data-action="leave-voice"]')?.addEventListener('click', () => {
+    this._closeChannelCtxMenu();
+    this._leaveVoice();
+  });
+  // Channel Functions panel toggle — sideways popout
+  document.querySelector('[data-action="channel-functions"]')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const panel = document.getElementById('channel-functions-panel');
+    if (!panel) return;
+    const isHidden = panel.style.display === 'none' || panel.style.display === '';
+    if (isHidden) {
+      panel.style.display = 'block';
+      // Position the panel to the right of the context menu
+      const menu = this._ctxMenuEl;
+      if (menu) {
+        const menuRect = menu.getBoundingClientRect();
+        const btnRect = e.currentTarget.getBoundingClientRect();
+        let left = menuRect.right + 4;
+        let top = btnRect.top;
+        // Show on screen, measure, then adjust
+        panel.style.left = left + 'px';
+        panel.style.top = top + 'px';
+        requestAnimationFrame(() => {
+          const pr = panel.getBoundingClientRect();
+          // If it overflows right, flip to the left side
+          if (pr.right > window.innerWidth - 8) {
+            left = menuRect.left - pr.width - 4;
+          }
+          // If it overflows bottom, nudge up
+          if (pr.bottom > window.innerHeight - 8) {
+            top = Math.max(4, window.innerHeight - pr.height - 8);
+          }
+          panel.style.left = left + 'px';
+          panel.style.top = top + 'px';
+        });
+      }
+    } else {
+      panel.style.display = 'none';
+    }
+  });
+  // Channel Functions panel — row clicks
+  document.getElementById('channel-functions-panel')?.addEventListener('click', (e) => {
+    const row = e.target.closest('.cfn-row');
+    if (!row || row.classList.contains('cfn-disabled')) return;
+    e.stopPropagation();
+    const fn = row.dataset.fn;
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    const ch = this.channels.find(c => c.code === code);
+
+    // Helper: optimistically update ch, re-render panel.
+    // The server can still refuse the change — a permission it doesn't grant,
+    // or a rule like "enable voice first" — and it answers a refusal with
+    // error-msg and no new channel state. Remember what the row held before
+    // the click so _revertPendingChannelToggle can put it back; without that
+    // the switch sat on its new value while the toast said it hadn't moved.
+    const optimistic = (patch) => {
+      if (ch) {
+        const prev = {};
+        for (const key of Object.keys(patch)) prev[key] = ch[key];
+        this._cfnPendingToggle = { code, prev, at: Date.now() };
+        Object.assign(ch, patch);
+      }
+      this._updateChannelFunctionsPanel(ch);
+    };
+
+    if (fn === 'streams') {
+      const newVal = ch && ch.streams_enabled === 0 ? 1 : 0;
+      optimistic({ streams_enabled: newVal });
+      this.socket.emit('toggle-channel-permission', { code, permission: 'streams' });
+    } else if (fn === 'music') {
+      const newVal = ch && ch.music_enabled === 0 ? 1 : 0;
+      optimistic({ music_enabled: newVal });
+      this.socket.emit('toggle-channel-permission', { code, permission: 'music' });
+    } else if (fn === 'media') {
+      const newVal = ch && ch.media_enabled === 0 ? 1 : 0;
+      optimistic({ media_enabled: newVal });
+      this.socket.emit('toggle-channel-permission', { code, permission: 'media' });
+    } else if (fn === 'soundboard') {
+      const newVal = ch && ch.soundboard_enabled === 0 ? 1 : 0;
+      optimistic({ soundboard_enabled: newVal });
+      this.socket.emit('toggle-channel-permission', { code, permission: 'soundboard' });
+    } else if (fn === 'read-only') {
+      const newVal = ch && ch.read_only ? 0 : 1;
+      optimistic({ read_only: newVal });
+      this.socket.emit('toggle-channel-permission', { code, permission: 'read_only' });
+    } else if (fn === 'slow-mode') {
+      const badge = row.querySelector('.cfn-badge');
+      if (!badge || badge.tagName === 'INPUT') return;
+      const current = (ch && ch.slow_mode_interval) || 0;
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.max = '3600';
+      input.value = current; input.className = 'cfn-input';
+      input.onclick = e2 => e2.stopPropagation();
+      badge.replaceWith(input);
+      input.focus(); input.select();
+      const commit = () => {
+        const interval = parseInt(input.value);
+        if (!isNaN(interval) && interval >= 0 && interval <= 3600) {
+          optimistic({ slow_mode_interval: interval });
+          this.socket.emit('set-slow-mode', { code, interval });
+        }
+      };
+      input.addEventListener('keydown', e2 => { if (e2.key === 'Enter') { commit(); input.blur(); } });
+      input.addEventListener('blur', commit);
+    } else if (fn === 'cleanup-exempt') {
+      const newVal = ch && ch.cleanup_exempt === 1 ? 0 : 1;
+      optimistic({ cleanup_exempt: newVal });
+      this.socket.emit('toggle-cleanup-exempt', { code });
+    } else if (fn === 'welcome') {
+      const newVal = ch && ch.show_welcome === 1 ? 0 : 1;
+      optimistic({ show_welcome: newVal });
+      this.socket.emit('toggle-welcome-channel', { code });
+    } else if (fn === 'voice') {
+      const newVal = ch && ch.voice_enabled === 0 ? 1 : 0;
+      // Disabling voice also disables streams and music
+      const patch = { voice_enabled: newVal };
+      if (newVal === 0) { patch.streams_enabled = 0; patch.music_enabled = 0; }
+      optimistic(patch);
+      this.socket.emit('toggle-channel-permission', { code, permission: 'voice' });
+    } else if (fn === 'text') {
+      const newVal = ch && ch.text_enabled === 0 ? 1 : 0;
+      optimistic({ text_enabled: newVal });
+      this.socket.emit('toggle-channel-permission', { code, permission: 'text' });
+    } else if (fn === 'announcement') {
+      const isAnnouncement = ch && ch.notification_type === 'announcement';
+      const newType = isAnnouncement ? 'default' : 'announcement';
+      optimistic({ notification_type: newType });
+      this.socket.emit('set-notification-type', { code, type: newType });
+    } else if (fn === 'default-role') {
+      // (#5389) Dropdown of available server roles. Selecting one fires
+      // set-channel-default-role; selecting "None" clears the default.
+      if (row.querySelector('.cfn-select')) return;
+      const badge = row.querySelector('.cfn-badge');
+      if (!badge) return;
+      // Lazy-fetch roles if we haven't yet (e.g. admin opened the panel
+      // before visiting the Roles page).
+      const _open = () => {
+        const roles = Array.isArray(this._allRoles) ? this._allRoles : [];
+        const select = document.createElement('select');
+        select.className = 'cfn-select cfn-input';
+        select.onclick = e2 => e2.stopPropagation();
+        const noneOpt = document.createElement('option');
+        noneOpt.value = ''; noneOpt.textContent = 'None';
+        select.appendChild(noneOpt);
+        for (const r of roles) {
+          const opt = document.createElement('option');
+          opt.value = String(r.id);
+          opt.textContent = r.name;
+          if (ch && r.id === ch.default_role_id) opt.selected = true;
+          select.appendChild(opt);
+        }
+        badge.replaceWith(select);
+        select.focus();
+        let committed = false;
+        const commit = () => {
+          if (committed) return;
+          committed = true;
+          const raw = select.value;
+          const roleId = raw ? parseInt(raw, 10) : null;
+          optimistic({ default_role_id: roleId });
+          this.socket.emit('set-channel-default-role', { code, roleId });
+        };
+        select.addEventListener('change', () => { commit(); select.blur(); });
+        select.addEventListener('blur', () => {
+          if (!committed) this._updateChannelFunctionsPanel(ch);
+        });
+      };
+      if (Array.isArray(this._allRoles) && this._allRoles.length) {
+        _open();
+      } else {
+        this.socket.emit('get-roles', {}, (res) => {
+          if (res && Array.isArray(res.roles)) this._allRoles = res.roles;
+          _open();
+        });
+      }
+    } else if (fn === 'user-limit') {
+      // If an input is already showing, don't open another
+      if (row.querySelector('.cfn-input')) return;
+      const badge = row.querySelector('.cfn-badge');
+      if (!badge) return;
+      const current = (ch && ch.voice_user_limit) || 0;
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '2'; input.max = '99';
+      input.value = current >= 2 ? current : ''; input.placeholder = t('channel_functions.voice_limit_placeholder'); input.className = 'cfn-input';
+      input.onclick = e2 => e2.stopPropagation();
+      badge.replaceWith(input);
+      input.focus(); input.select();
+      const commitLimit = () => {
+        const raw = parseInt(input.value);
+        // Blank or less than 2 = unlimited (0). Valid range: 2–99.
+        const limit = (!isNaN(raw) && raw >= 2 && raw <= 99) ? raw : 0;
+        optimistic({ voice_user_limit: limit });
+        this.socket.emit('set-voice-user-limit', { code, limit });
+      };
+      input.addEventListener('keydown', e2 => { if (e2.key === 'Enter') { commitLimit(); input.blur(); } });
+      input.addEventListener('blur', commitLimit);
+    } else if (fn === 'voice-bitrate') {
+      if (row.querySelector('.cfn-input')) return;
+      const badge = row.querySelector('.cfn-badge');
+      if (!badge) return;
+      const current = (ch && ch.voice_bitrate) || 0;
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.max = '512';
+      input.value = current > 0 ? current : ''; input.placeholder = t('channel_functions.bitrate_placeholder'); input.className = 'cfn-input';
+      input.onclick = e2 => e2.stopPropagation();
+      badge.replaceWith(input);
+      input.focus(); input.select();
+      const commitBitrate = () => {
+        const raw = parseInt(input.value);
+        const validBitrates = [0, 32, 64, 96, 128, 256, 512];
+        // Snap to nearest valid bitrate, or 0 if blank/invalid
+        let bitrate = 0;
+        if (!isNaN(raw) && raw > 0) {
+          bitrate = validBitrates.reduce((prev, curr) =>
+            Math.abs(curr - raw) < Math.abs(prev - raw) ? curr : prev
+          );
+        }
+        optimistic({ voice_bitrate: bitrate });
+        this.socket.emit('set-voice-bitrate', { code, bitrate });
+      };
+      input.addEventListener('keydown', e2 => { if (e2.key === 'Enter') { commitBitrate(); input.blur(); } });
+      input.addEventListener('blur', commitBitrate);
+    } else if (fn === 'self-destruct') {
+      if (row.querySelector('.cfn-input')) return;
+      const badge = row.querySelector('.cfn-badge');
+      if (!badge) return;
+      // #5390 — self-destruct now has two modes: 'delete' (legacy: remove
+      // the whole channel when the timer fires) and 'clear' (wipe messages
+      // only, then rearm the timer at the same interval). We render the
+      // hours input next to a mode select so admins can pick both at once.
+      const wrap = document.createElement('span');
+      wrap.className = 'cfn-input-wrap';
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.max = '720';
+      input.value = ''; input.placeholder = t('channel_functions.self_destruct_placeholder'); input.className = 'cfn-input cfn-input-hours';
+      input.onclick = e2 => e2.stopPropagation();
+      const modeSelect = document.createElement('select');
+      modeSelect.className = 'cfn-input cfn-mode-select';
+      const optDelete = document.createElement('option');
+      optDelete.value = 'delete';
+      optDelete.textContent = t('channel_functions.self_destruct_mode_delete') || 'Delete channel';
+      const optClear = document.createElement('option');
+      optClear.value = 'clear';
+      optClear.textContent = t('channel_functions.self_destruct_mode_clear') || 'Clear messages';
+      modeSelect.appendChild(optDelete);
+      modeSelect.appendChild(optClear);
+      modeSelect.value = ch?.auto_delete_mode === 'clear' ? 'clear' : 'delete';
+      modeSelect.onclick = e2 => e2.stopPropagation();
+      wrap.appendChild(input);
+      wrap.appendChild(modeSelect);
+      badge.replaceWith(wrap);
+      input.focus(); input.select();
+      let committed = false;
+      const commitExpiry = () => {
+        if (committed) return;
+        const hours = parseInt(input.value);
+        if (isNaN(hours) || hours < 0) return;
+        committed = true;
+        const mode = modeSelect.value === 'clear' ? 'clear' : 'delete';
+        if (hours === 0) {
+          optimistic({ expires_at: null, auto_delete_mode: 'delete', auto_delete_interval_hours: null });
+          this.socket.emit('set-channel-expiry', { code, hours: 0, mode });
+        } else {
+          const clamped = Math.max(1, Math.min(720, hours));
+          const expiresAt = new Date(Date.now() + clamped * 3600000).toISOString();
+          optimistic({ expires_at: expiresAt, auto_delete_mode: mode, auto_delete_interval_hours: clamped });
+          this.socket.emit('set-channel-expiry', { code, hours: clamped, mode });
+        }
+      };
+      // Delay blur-commit briefly so focus moving between input and select
+      // inside the wrap doesn't fire a premature commit with stale values.
+      const onBlur = () => {
+        setTimeout(() => {
+          if (!wrap.contains(document.activeElement)) commitExpiry();
+        }, 50);
+      };
+      input.addEventListener('keydown', e2 => { if (e2.key === 'Enter') { commitExpiry(); input.blur(); } });
+      input.addEventListener('blur', onBlur);
+      modeSelect.addEventListener('blur', onBlur);
+    } else if (fn === 'afk-sub') {
+      // Show a select dropdown of sub-channels for this parent
+      if (row.querySelector('.cfn-select')) return;
+      const badge = row.querySelector('.cfn-badge');
+      if (!badge) return;
+      const subs = (this.channels || []).filter(c => c.parent_channel_id === ch?.id);
+      const select = document.createElement('select');
+      select.className = 'cfn-select cfn-input';
+      select.onclick = e2 => e2.stopPropagation();
+      const noneOpt = document.createElement('option');
+      noneOpt.value = ''; noneOpt.textContent = 'None (disabled)';
+      select.appendChild(noneOpt);
+      for (const sub of subs) {
+        const opt = document.createElement('option');
+        opt.value = sub.code;
+        opt.textContent = sub.name;
+        if (sub.code === ch?.afk_sub_code) opt.selected = true;
+        select.appendChild(opt);
+      }
+      badge.replaceWith(select);
+      select.focus();
+      const commitAfkSub = () => {
+        const subCode = select.value;
+        const timeout = ch?.afk_timeout_minutes || 5;
+        optimistic({ afk_sub_code: subCode || null });
+        this.socket.emit('set-channel-afk', { code, subCode, timeout });
+      };
+      select.addEventListener('change', () => { commitAfkSub(); select.blur(); });
+      select.addEventListener('blur', () => {
+        // Replace select back with badge
+        this._updateChannelFunctionsPanel(ch);
+      });
+    } else if (fn === 'afk-timeout') {
+      if (row.querySelector('.cfn-input')) return;
+      const badge = row.querySelector('.cfn-badge');
+      if (!badge) return;
+      const current = ch?.afk_timeout_minutes || 0;
+      const input = document.createElement('input');
+      input.type = 'number'; input.min = '0'; input.max = '1440';
+      input.value = current > 0 ? current : ''; input.placeholder = '1–1440 (0=off)'; input.className = 'cfn-input';
+      input.onclick = e2 => e2.stopPropagation();
+      badge.replaceWith(input);
+      input.focus(); input.select();
+      const commitAfkTimeout = () => {
+        const mins = parseInt(input.value);
+        const timeout = (!isNaN(mins) && mins >= 0 && mins <= 1440) ? mins : 0;
+        const subCode = ch?.afk_sub_code || '';
+        optimistic({ afk_timeout_minutes: timeout });
+        this.socket.emit('set-channel-afk', { code, subCode, timeout });
+      };
+      input.addEventListener('keydown', e2 => { if (e2.key === 'Enter') { commitAfkTimeout(); input.blur(); } });
+      input.addEventListener('blur', commitAfkTimeout);
+    }
+  });
+  // Move channel up/down
+  document.querySelector('[data-action="organize"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    this._openOrganizeModal(code);
+  });
+  // Move to parent (reparent)
+  document.querySelector('[data-action="move-to-parent"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    this._openReparentModal(code);
+  });
+  // Promote sub-channel to top-level
+  document.querySelector('[data-action="promote-channel"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    const ch = this.channels.find(c => c.code === code);
+    if (!ch || !ch.parent_channel_id) return;
+    if (confirm(t('confirm.promote_channel', { name: ch.name }))) {
+      this.socket.emit('reparent-channel', { code, newParentCode: null });
+    }
+  });
+  // Reparent modal cancel
+  document.getElementById('reparent-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('reparent-modal').style.display = 'none';
+  });
+  document.getElementById('reparent-modal')?.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+      document.getElementById('reparent-modal').style.display = 'none';
+    }
+  });
+  // Organize modal controls
+  document.getElementById('organize-global-sort')?.addEventListener('change', (e) => {
+    if (!this._organizeParentCode) return;
+    const sortMode = e.target.value; // 'server_default', 'manual', 'alpha', 'created', 'oldest', 'dynamic'
+    if (this._organizeServerLevel) {
+      if (sortMode === 'server_default') {
+        // Use server default — remove any personal override
+        localStorage.removeItem('haven_server_sort_mode');
+      } else if (this.user?.isAdmin || this._hasPerm('manage_server')) {
+        // Admin: update the server-wide default sort mode
+        this.socket.emit('update-server-setting', { key: 'channel_sort_mode', value: sortMode });
+        localStorage.removeItem('haven_server_sort_mode');
+      } else {
+        // Non-admin: save as personal override only
+        localStorage.setItem('haven_server_sort_mode', sortMode);
+      }
+    } else {
+      // Sub-channel sort: store on the parent channel (server-side)
+      this.socket.emit('set-sort-alphabetical', { code: this._organizeParentCode, enabled: sortMode === 'alpha', mode: sortMode });
+      const parent = this.channels.find(c => c.code === this._organizeParentCode);
+      if (parent) parent.sort_alphabetical = sortMode === 'alpha' ? 1 : sortMode === 'created' ? 2 : sortMode === 'oldest' ? 3 : sortMode === 'dynamic' ? 4 : 0;
+    }
+    this._renderOrganizeList();
+    if (this._organizeServerLevel) this._renderChannels();
+  });
+  document.getElementById('organize-cat-sort')?.addEventListener('change', (e) => {
+    if (!this._organizeParentCode) return;
+    this._organizeCatSort = e.target.value;
+    localStorage.setItem(`haven_cat_sort_${this._organizeParentCode}`, e.target.value);
+    // Server-level: sync category sort to server so all users see it
+    if (this._organizeServerLevel && (this.user?.isAdmin || this._hasPerm('manage_server'))) {
+      this.socket.emit('update-server-setting', { key: 'channel_cat_sort', value: e.target.value });
+    }
+    this._renderOrganizeList();
+    if (this._organizeServerLevel) this._renderChannels();
+  });
+  document.getElementById('organize-move-up')?.addEventListener('click', () => {
+    // Category movement
+    if (this._organizeSelectedTag) {
+      this._moveCategoryInOrder(-1);
+      return;
+    }
+    if (!this._organizeSelected) return;
+    const ch = this._organizeList.find(c => c.code === this._organizeSelected);
+    if (!ch) return;
+    const { group, effectiveSort } = this._getOrganizeVisualGroup(ch);
+    if (effectiveSort !== 'manual') return;
+    const groupIdx = group.findIndex(c => c.code === this._organizeSelected);
+    if (groupIdx <= 0) return;
+    // Swap in the sorted group, then reassign group positions cleanly
+    [group[groupIdx], group[groupIdx - 1]] = [group[groupIdx - 1], group[groupIdx]];
+    const positions = group.map(c => c.position ?? 0).sort((a, b) => a - b);
+    for (let i = 1; i < positions.length; i++) { if (positions[i] <= positions[i - 1]) positions[i] = positions[i - 1] + 1; }
+    group.forEach((c, i) => { c.position = positions[i]; });
+    this._renderOrganizeList();
+    this.socket.emit('reorder-channels', { order: this._organizeList.map(c => ({ code: c.code, position: c.position })) });
+  });
+  document.getElementById('organize-move-down')?.addEventListener('click', () => {
+    // Category movement
+    if (this._organizeSelectedTag) {
+      this._moveCategoryInOrder(1);
+      return;
+    }
+    if (!this._organizeSelected) return;
+    const ch = this._organizeList.find(c => c.code === this._organizeSelected);
+    if (!ch) return;
+    const { group, effectiveSort } = this._getOrganizeVisualGroup(ch);
+    if (effectiveSort !== 'manual') return;
+    const groupIdx = group.findIndex(c => c.code === this._organizeSelected);
+    if (groupIdx < 0 || groupIdx >= group.length - 1) return;
+    // Swap in the sorted group, then reassign group positions cleanly
+    [group[groupIdx], group[groupIdx + 1]] = [group[groupIdx + 1], group[groupIdx]];
+    const positions = group.map(c => c.position ?? 0).sort((a, b) => a - b);
+    for (let i = 1; i < positions.length; i++) { if (positions[i] <= positions[i - 1]) positions[i] = positions[i - 1] + 1; }
+    group.forEach((c, i) => { c.position = positions[i]; });
+    this._renderOrganizeList();
+    this.socket.emit('reorder-channels', { order: this._organizeList.map(c => ({ code: c.code, position: c.position })) });
+  });
+  document.getElementById('organize-set-tag')?.addEventListener('click', () => {
+    if (!this._organizeSelected) return;
+    const tag = document.getElementById('organize-tag-input').value.trim();
+    if (!tag) return;
+    this.socket.emit('set-channel-category', { code: this._organizeSelected, category: tag });
+    const ch = this._organizeList.find(c => c.code === this._organizeSelected);
+    if (ch) ch.category = tag;
+    // Also update main channels array
+    const mainCh = this.channels.find(c => c.code === this._organizeSelected);
+    if (mainCh) mainCh.category = tag;
+    this._renderOrganizeList();
+  });
+  document.getElementById('organize-remove-tag')?.addEventListener('click', () => {
+    if (!this._organizeSelected) return;
+    this.socket.emit('set-channel-category', { code: this._organizeSelected, category: '' });
+    const ch = this._organizeList.find(c => c.code === this._organizeSelected);
+    if (ch) ch.category = null;
+    const mainCh = this.channels.find(c => c.code === this._organizeSelected);
+    if (mainCh) mainCh.category = null;
+    document.getElementById('organize-tag-input').value = '';
+    this._renderOrganizeList();
+  });
+  document.getElementById('organize-done-btn')?.addEventListener('click', () => {
+    document.getElementById('organize-modal').style.display = 'none';
+    if (this._organizeServerLevel) this._renderChannels();
+    this._organizeParentCode = null;
+    this._organizeList = null;
+    this._organizeSelected = null;
+    this._organizeSelectedTag = null;
+    this._organizeServerLevel = false;
+  });
+  document.getElementById('organize-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'organize-modal') {
+      document.getElementById('organize-modal').style.display = 'none';
+      if (this._organizeServerLevel) this._renderChannels();
+      this._organizeParentCode = null;
+      this._organizeList = null;
+      this._organizeSelected = null;
+      this._organizeSelectedTag = null;
+      this._organizeServerLevel = false;
+    }
+  });
+  // ── DM Organize Modal ──
+  document.getElementById('organize-dms-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation(); // don't toggle DM collapse
+    this._openDmOrganizeModal();
+  });
+  document.getElementById('dm-organize-sort')?.addEventListener('change', () => {
+    const mode = document.getElementById('dm-organize-sort').value;
+    localStorage.setItem('haven_dm_sort_mode', mode);
+    this._renderDmOrganizeList();
+  });
+  document.getElementById('dm-organize-move-up')?.addEventListener('click', () => {
+    if (!this._dmOrganizeSelected) return;
+    const idx = this._dmOrganizeList.findIndex(c => c.code === this._dmOrganizeSelected);
+    if (idx <= 0) return;
+    [this._dmOrganizeList[idx], this._dmOrganizeList[idx - 1]] = [this._dmOrganizeList[idx - 1], this._dmOrganizeList[idx]];
+    this._saveDmOrder();
+    this._renderDmOrganizeList();
+  });
+  document.getElementById('dm-organize-move-down')?.addEventListener('click', () => {
+    if (!this._dmOrganizeSelected) return;
+    const idx = this._dmOrganizeList.findIndex(c => c.code === this._dmOrganizeSelected);
+    if (idx < 0 || idx >= this._dmOrganizeList.length - 1) return;
+    [this._dmOrganizeList[idx], this._dmOrganizeList[idx + 1]] = [this._dmOrganizeList[idx + 1], this._dmOrganizeList[idx]];
+    this._saveDmOrder();
+    this._renderDmOrganizeList();
+  });
+  document.getElementById('dm-organize-set-tag')?.addEventListener('click', () => {
+    if (!this._dmOrganizeSelected) return;
+    const tag = document.getElementById('dm-organize-tag-input').value.trim();
+    if (!tag) return;
+    const assignments = JSON.parse(localStorage.getItem('haven_dm_assignments') || '{}');
+    assignments[this._dmOrganizeSelected] = tag;
+    localStorage.setItem('haven_dm_assignments', JSON.stringify(assignments));
+    // Ensure category entry exists
+    const cats = JSON.parse(localStorage.getItem('haven_dm_categories') || '{}');
+    if (!cats[tag]) cats[tag] = { collapsed: false };
+    localStorage.setItem('haven_dm_categories', JSON.stringify(cats));
+    this._renderDmOrganizeList();
+  });
+  document.getElementById('dm-organize-remove-tag')?.addEventListener('click', () => {
+    if (!this._dmOrganizeSelected) return;
+    const assignments = JSON.parse(localStorage.getItem('haven_dm_assignments') || '{}');
+    delete assignments[this._dmOrganizeSelected];
+    localStorage.setItem('haven_dm_assignments', JSON.stringify(assignments));
+    document.getElementById('dm-organize-tag-input').value = '';
+    this._renderDmOrganizeList();
+  });
+  document.getElementById('dm-organize-done-btn')?.addEventListener('click', () => {
+    document.getElementById('dm-organize-modal').style.display = 'none';
+    this._dmOrganizeList = null;
+    this._dmOrganizeSelected = null;
+    this._renderChannels();
+  });
+  document.getElementById('dm-organize-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'dm-organize-modal') {
+      document.getElementById('dm-organize-modal').style.display = 'none';
+      this._dmOrganizeList = null;
+      this._dmOrganizeSelected = null;
+      this._renderChannels();
+    }
+  });
+  // Webhooks management
+  document.querySelector('[data-action="webhooks"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    this._openWebhookModal(code);
+  });
+  // Channel Roles management
+  document.querySelector('[data-action="channel-roles"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    this._openChannelRolesModal(code);
+  });
+  document.getElementById('channel-roles-done-btn')?.addEventListener('click', () => {
+    document.getElementById('channel-roles-modal').style.display = 'none';
+  });
+  document.getElementById('channel-roles-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'channel-roles-modal') {
+      document.getElementById('channel-roles-modal').style.display = 'none';
+    }
+  });
+  document.getElementById('channel-roles-assign-btn')?.addEventListener('click', () => {
+    this._assignChannelRole();
+  });
+  document.getElementById('channel-roles-create-btn')?.addEventListener('click', () => {
+    this._createChannelRole();
+  });
+  document.getElementById('webhook-create-btn')?.addEventListener('click', () => {
+    const name = document.getElementById('webhook-name-input').value.trim();
+    if (!name) return;
+    const code = document.getElementById('webhook-modal')._channelCode;
+    if (!code) return;
+    this.socket.emit('create-webhook', { channelCode: code, name });
+    document.getElementById('webhook-name-input').value = '';
+  });
+  document.getElementById('webhook-copy-url-btn')?.addEventListener('click', () => {
+    const urlEl = document.getElementById('webhook-url-display');
+    const markCopied = () => {
+      document.getElementById('webhook-copy-url-btn').textContent = '✅ ' + t('common.copied');
+      setTimeout(() => { document.getElementById('webhook-copy-url-btn').textContent = '📋 ' + t('common.copy'); }, 2000);
+    };
+    navigator.clipboard.writeText(urlEl.value).then(markCopied).catch(() => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = urlEl.value;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        markCopied();
+      } catch { /* could not copy */ }
+    });
+  });
+  document.getElementById('webhook-close-btn')?.addEventListener('click', () => {
+    document.getElementById('webhook-modal').style.display = 'none';
+  });
+  document.getElementById('webhook-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  // Create sub-channel
+  document.querySelector('[data-action="create-sub-channel"]')?.addEventListener('click', () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    const parentCh = this.channels.find(c => c.code === code);
+    if (!parentCh) return;
+    // Show the create-sub-channel modal
+    document.getElementById('create-sub-name').value = '';
+    document.getElementById('create-sub-private').checked = false;
+    document.getElementById('create-sub-temporary').checked = false;
+    document.getElementById('sub-temp-duration-row').style.display = 'none';
+    document.getElementById('create-sub-parent-name').textContent = `# ${parentCh.name}`;
+    document.getElementById('create-sub-modal').style.display = 'flex';
+    document.getElementById('create-sub-modal')._parentCode = code;
+    document.getElementById('create-sub-name').focus();
+  });
+  // Create sub-channel modal confirm/cancel
+  document.getElementById('create-sub-confirm-btn')?.addEventListener('click', () => {
+    const modal = document.getElementById('create-sub-modal');
+    const name = document.getElementById('create-sub-name').value.trim();
+    const isPrivate = document.getElementById('create-sub-private').checked;
+    const temporary = document.getElementById('create-sub-temporary').checked;
+    const duration = parseInt(document.getElementById('create-sub-duration').value) || 24;
+    if (!name) return;
+    this.socket.emit('create-sub-channel', {
+      parentCode: modal._parentCode,
+      name,
+      isPrivate,
+      temporary,
+      duration
+    });
+    modal.style.display = 'none';
+  });
+  document.getElementById('create-sub-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('create-sub-modal').style.display = 'none';
+  });
+  document.getElementById('create-sub-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  // Toggle sub-channel temporary duration row
+  const subTempCheckbox = document.getElementById('create-sub-temporary');
+  if (subTempCheckbox) {
+    subTempCheckbox.addEventListener('change', () => {
+      const durRow = document.getElementById('sub-temp-duration-row');
+      if (durRow) durRow.style.display = subTempCheckbox.checked ? '' : 'none';
+    });
+  }
+  // Rename channel / sub-channel
+  document.querySelector('[data-action="rename-channel"]')?.addEventListener('click', async () => {
+    const code = this._ctxMenuChannel;
+    if (!code) return;
+    this._closeChannelCtxMenu();
+    const ch = this.channels.find(c => c.code === code);
+    if (!ch) return;
+    const name = await this._showPromptModal(t('modals.rename_channel.title'), t('modals.rename_channel.prompt', { name: ch.name }), ch.name);
+    if (name && name.trim() && name.trim() !== ch.name) {
+      this.socket.emit('rename-channel', { code, name: name.trim() });
+    }
+  });
+  // Close context menu on outside click
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.channel-ctx-menu') && !e.target.closest('.channel-more-btn') && !e.target.closest('.channel-functions-panel')) {
+      this._closeChannelCtxMenu();
+    }
+  });
+
+  // Voice buttons
+  document.getElementById('voice-join-btn').addEventListener('click', () => this._joinVoice());
+  document.getElementById('voice-join-mobile')?.addEventListener('click', () => {
+    this._joinVoice();
+    this._closeMobilePanels();
+  });
+  document.getElementById('voice-mute-btn').addEventListener('click', () => this._toggleMute());
+  document.getElementById('voice-deafen-btn').addEventListener('click', () => this._toggleDeafen());
+  document.getElementById('voice-mute-btn-header')?.addEventListener('click', () => this._toggleMute());
+  document.getElementById('voice-deafen-btn-header')?.addEventListener('click', () => this._toggleDeafen());
+  document.getElementById('voice-leave-sidebar-btn').addEventListener('click', () => this._leaveVoice());
+  document.getElementById('voice-cam-btn').addEventListener('click', () => this._toggleWebcam());
+  document.getElementById('screen-share-btn').addEventListener('click', () => this._toggleScreenShare());
+  document.getElementById('voice-soundboard-btn')?.addEventListener('click', () => this._openSoundModal('soundboard'));
+  document.getElementById('voice-listen-together-btn')?.addEventListener('click', () => this._openMusicModal());
+  document.getElementById('screen-share-minimize').addEventListener('click', () => this._hideScreenShare());
+  document.getElementById('screen-share-close').addEventListener('click', () => this._closeScreenShare());
+  document.getElementById('webcam-collapse-btn').addEventListener('click', () => {
+    const wc = document.getElementById('webcam-container');
+    if (wc) {
+      wc.style.display = 'none';
+      // Show a restore indicator in the channel header
+      const grid = document.getElementById('webcam-grid');
+      const count = grid ? grid.children.length : 0;
+      if (count > 0) this._showWebcamIndicator(count);
+    }
+  });
+  document.getElementById('webcam-close-btn').addEventListener('click', () => {
+    this._closeWebcam();
+  });
+
+  // Music controls
+  document.getElementById('music-share-btn')?.addEventListener('click', () => this._openMusicModal());
+  document.getElementById('share-music-btn').addEventListener('click', () => this._shareMusic());
+  document.getElementById('share-music-playlist-btn')?.addEventListener('click', () => this._shareMusicPlaylist());
+  document.getElementById('cancel-music-btn').addEventListener('click', () => this._closeMusicModal());
+  document.getElementById('music-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'music-modal') this._closeMusicModal();
+  });
+  document.getElementById('music-stop-btn').addEventListener('click', () => this._stopMusic());
+  document.getElementById('music-close-btn').addEventListener('click', () => {
+    this._minimizeMusicPanel();
+  });
+  document.getElementById('music-queue-btn')?.addEventListener('click', () => this._openMusicQueueModal());
+  document.getElementById('close-music-queue-btn')?.addEventListener('click', () => this._closeMusicQueueModal());
+  document.getElementById('shuffle-music-queue-btn')?.addEventListener('click', () => this._shuffleMusicQueue());
+  document.getElementById('music-queue-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'music-queue-modal') this._closeMusicQueueModal();
+  });
+  document.getElementById('music-popout-btn').addEventListener('click', () => this._popOutMusicPlayer());
+  document.getElementById('music-play-pause-btn').addEventListener('click', () => this._toggleMusicPlayPause());
+  document.getElementById('music-next-btn').addEventListener('click', () => this._musicTrackControl('next'));
+  document.getElementById('music-mute-btn').addEventListener('click', () => this._toggleMusicMute());
+  document.getElementById('music-volume-slider').addEventListener('input', (e) => {
+    this._setMusicVolume(parseInt(e.target.value));
+  });
+  // Seek slider — user drags to scrub position
+  const seekSlider = document.getElementById('music-seek-slider');
+  seekSlider.addEventListener('input', () => { this._musicSeeking = true; });
+  seekSlider.addEventListener('change', (e) => {
+    this._musicSeeking = false;
+    const pct = parseFloat(e.target.value);
+    this._suppressMusicBroadcasts();
+    this._seekMusic(pct);
+    this._withMusicDuration((durationSeconds) => {
+      const positionSeconds = durationSeconds > 0 ? (durationSeconds * pct) / 100 : 0;
+      this._emitMusicSeek(positionSeconds, durationSeconds);
+    });
+    this._setMusicActivityHint('You seeked.');
+  });
+  document.getElementById('music-link-input').addEventListener('input', (e) => {
+    this._previewMusicLink(e.target.value.trim());
+  });
+  document.getElementById('music-link-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); this._shareMusic(); }
+  });
+
+  // Voice controls — now pinned at bottom of right sidebar
+  // The header voice-active-indicator opens the RIGHT sidebar on mobile
+  document.getElementById('voice-active-indicator')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // On mobile, open the RIGHT sidebar so the user can access voice controls
+    const appBody = document.getElementById('app-body');
+    if (window.innerWidth <= 900 && appBody) {
+      appBody.classList.add('mobile-right-open');
+      // Activate the mobile-overlay backdrop too, so tap-outside-to-close
+      // works the same way as it does for the Members button. Without this
+      // the sidebar slides in but the dim overlay never appears (#5385).
+      document.getElementById('mobile-overlay')?.classList.add('active');
+    }
+  });
+
+  // Voice settings slide-up toggle
+  document.getElementById('voice-settings-toggle')?.addEventListener('click', () => {
+    const panel = document.getElementById('voice-settings-panel');
+    if (!panel) return;
+    const btn = document.getElementById('voice-settings-toggle');
+    if (panel.style.display === 'none') {
+      panel.style.display = '';
+      if (btn) btn.classList.add('active');
+      // Populate audio device dropdowns each time panel opens
+      this._populateAudioDevices();
+    } else {
+      panel.style.display = 'none';
+      if (btn) btn.classList.remove('active');
+    }
+  });
+
+  // ── Audio device dropdowns (input & output & camera) ──
+  const inputDeviceSelect  = document.getElementById('voice-input-device');
+  const outputDeviceSelect = document.getElementById('voice-output-device');
+  const camDeviceSelect    = document.getElementById('voice-cam-device');
+  if (inputDeviceSelect) {
+    inputDeviceSelect.addEventListener('change', (e) => {
+      const deviceId = e.target.value;
+      localStorage.setItem('haven_input_device', deviceId);
+      // Hot-swap if in voice
+      if (this.voice && this.voice.inVoice) {
+        this.voice.switchInputDevice(deviceId);
+      }
+    });
+  }
+  if (outputDeviceSelect) {
+    outputDeviceSelect.addEventListener('change', (e) => {
+      const deviceId = e.target.value;
+      localStorage.setItem('haven_output_device', deviceId);
+      // Hot-swap output
+      if (this.voice) {
+        this.voice.switchOutputDevice(deviceId);
+      }
+    });
+  }
+  if (camDeviceSelect) {
+    camDeviceSelect.addEventListener('change', (e) => {
+      const deviceId = e.target.value;
+      localStorage.setItem('haven_cam_device', deviceId);
+      // Hot-swap camera if webcam is active
+      if (this.voice && this.voice.isWebcamActive) {
+        this.voice.switchCamera(deviceId);
+      }
+    });
+  }
+  // Stream size slider
+  const streamSizeSlider = document.getElementById('stream-size-slider');
+  if (streamSizeSlider) {
+    const savedSize = localStorage.getItem('haven_stream_size');
+    if (savedSize) streamSizeSlider.value = savedSize;
+    let _resizeRAF = null;
+    const applySize = () => {
+      if (_resizeRAF) cancelAnimationFrame(_resizeRAF);
+      _resizeRAF = requestAnimationFrame(() => {
+        // Auto-exit fullscreen (focus mode) when user adjusts the size slider
+        const container = document.getElementById('screen-share-container');
+        const grid = document.getElementById('screen-share-grid');
+        if (container.classList.contains('stream-focus-mode')) {
+          grid.querySelectorAll('.screen-share-tile').forEach(t => t.classList.remove('stream-focused'));
+          container.classList.remove('stream-focus-mode');
+        }
+        const vh = parseInt(streamSizeSlider.value, 10);
+        container.style.maxHeight = vh + 'vh';
+        grid.style.maxHeight = (vh - 2) + 'vh';
+        document.querySelectorAll('.screen-share-tile video').forEach(v => { v.style.maxHeight = (vh - 4) + 'vh'; });
+        localStorage.setItem('haven_stream_size', vh);
+        _resizeRAF = null;
+      });
+    };
+    applySize();
+    streamSizeSlider.addEventListener('input', applySize);
+  }
+
+  // ── Stream layout picker ──
+  const layoutBtn = document.getElementById('stream-layout-btn');
+  const layoutMenu = document.getElementById('stream-layout-menu');
+  if (layoutBtn && layoutMenu) {
+    const savedLayout = localStorage.getItem('haven_stream_layout') || 'auto';
+    this._applyStreamLayout(savedLayout);
+    layoutMenu.querySelector(`[data-layout="${savedLayout}"]`)?.classList.add('active');
+
+    layoutBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      layoutMenu.classList.toggle('open');
+    });
+    layoutMenu.querySelectorAll('.stream-layout-opt').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mode = opt.dataset.layout;
+        layoutMenu.querySelectorAll('.stream-layout-opt').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        this._applyStreamLayout(mode);
+        localStorage.setItem('haven_stream_layout', mode);
+        layoutMenu.classList.remove('open');
+      });
+    });
+    document.addEventListener('click', () => layoutMenu.classList.remove('open'));
+  }
+
+  // ── Webcam size slider ──
+  const webcamSizeSlider = document.getElementById('webcam-size-slider');
+  if (webcamSizeSlider) {
+    const savedWcSize = localStorage.getItem('haven_webcam_size');
+    if (savedWcSize) webcamSizeSlider.value = savedWcSize;
+    let _wcResizeRAF = null;
+    const applyWcSize = () => {
+      if (_wcResizeRAF) cancelAnimationFrame(_wcResizeRAF);
+      _wcResizeRAF = requestAnimationFrame(() => {
+        const container = document.getElementById('webcam-container');
+        const grid = document.getElementById('webcam-grid');
+        // Auto-exit focus mode when resizing
+        if (container.classList.contains('webcam-focus-mode')) {
+          grid.querySelectorAll('.webcam-tile').forEach(t => t.classList.remove('webcam-focused'));
+          container.classList.remove('webcam-focus-mode');
+        }
+        const vh = parseInt(webcamSizeSlider.value, 10);
+        container.style.maxHeight = vh + 'vh';
+        grid.style.maxHeight = (vh - 2) + 'vh';
+        // Scale tile width proportionally with the slider
+        const tileMaxW = Math.max(vh * 1.33, 15); // ~4:3 aspect ratio
+        document.querySelectorAll('.webcam-tile').forEach(t => { t.style.maxWidth = tileMaxW + 'vw'; });
+        document.querySelectorAll('.webcam-tile video').forEach(v => { v.style.maxHeight = (vh - 4) + 'vh'; });
+        localStorage.setItem('haven_webcam_size', vh);
+        _wcResizeRAF = null;
+      });
+    };
+    applyWcSize();
+    webcamSizeSlider.addEventListener('input', applyWcSize);
+  }
+
+  // ── Webcam layout picker ──
+  const wcLayoutBtn = document.getElementById('webcam-layout-btn');
+  const wcLayoutMenu = document.getElementById('webcam-layout-menu');
+  if (wcLayoutBtn && wcLayoutMenu) {
+    const savedWcLayout = localStorage.getItem('haven_webcam_layout') || 'auto';
+    this._applyWebcamLayout(savedWcLayout);
+    wcLayoutMenu.querySelector(`[data-layout="${savedWcLayout}"]`)?.classList.add('active');
+
+    wcLayoutBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      wcLayoutMenu.classList.toggle('open');
+    });
+    wcLayoutMenu.querySelectorAll('.stream-layout-opt').forEach(opt => {
+      opt.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const mode = opt.dataset.layout;
+        wcLayoutMenu.querySelectorAll('.stream-layout-opt').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        this._applyWebcamLayout(mode);
+        localStorage.setItem('haven_webcam_layout', mode);
+        wcLayoutMenu.classList.remove('open');
+      });
+    });
+    document.addEventListener('click', () => wcLayoutMenu.classList.remove('open'));
+  }
+
+  // ── Webcam HD (720p) toggle ──
+  const wcHdBtn = document.getElementById('webcam-hd-btn');
+  if (wcHdBtn) {
+    let hdOn = localStorage.getItem('haven_webcam_hd') === '1';
+    wcHdBtn.classList.toggle('active', hdOn);
+    wcHdBtn.addEventListener('click', () => {
+      hdOn = !hdOn;
+      wcHdBtn.classList.toggle('active', hdOn);
+      if (this.voice && this.voice.setWebcamHd) this.voice.setWebcamHd(hdOn);
+      else { try { localStorage.setItem('haven_webcam_hd', hdOn ? '1' : '0'); } catch {} }
+      if (this._showToast) this._showToast(hdOn ? t('media.hd_on') : t('media.hd_off'), 'info');
+    });
+  }
+
+  // ── Webcam background-blur toggle (best-effort native; shown only if supported) ──
+  const wcBlurBtn = document.getElementById('webcam-blur-btn');
+  if (wcBlurBtn) {
+    const sc = (navigator.mediaDevices && navigator.mediaDevices.getSupportedConstraints)
+      ? navigator.mediaDevices.getSupportedConstraints() : {};
+    if (sc.backgroundBlur) {
+      wcBlurBtn.hidden = false;
+      let blurOn = localStorage.getItem('haven_webcam_blur') === '1';
+      wcBlurBtn.classList.toggle('active', blurOn);
+      wcBlurBtn.setAttribute('aria-pressed', blurOn ? 'true' : 'false');
+      wcBlurBtn.addEventListener('click', () => {
+        blurOn = !blurOn;
+        wcBlurBtn.classList.toggle('active', blurOn);
+        wcBlurBtn.setAttribute('aria-pressed', blurOn ? 'true' : 'false');
+        if (this.voice && this.voice.setWebcamBlur) this.voice.setWebcamBlur(blurOn);
+        else { try { localStorage.setItem('haven_webcam_blur', blurOn ? '1' : '0'); } catch {} }
+        if (this._showToast) this._showToast(blurOn ? t('media.blur_on') : t('media.blur_off'), 'info');
+      });
+    }
+  }
+
+  // ── Webcam collapse button ── (handler already bound above)
+
+  // ── Noise mode selector ──
+  const noiseModeSelect = document.getElementById('voice-noise-mode');
+  const noiseGateRow = document.getElementById('noise-gate-row');
+  const nsSlider = document.getElementById('voice-ns-slider');
+
+  // Restore saved mode
+  const savedNoiseMode = localStorage.getItem('haven_noise_mode') || 'gate';
+  noiseModeSelect.value = savedNoiseMode;
+  noiseGateRow.style.display = savedNoiseMode === 'gate' ? '' : 'none';
+
+  noiseModeSelect.addEventListener('change', (e) => {
+    const mode = e.target.value;
+    noiseGateRow.style.display = mode === 'gate' ? '' : 'none';
+    if (this.voice) this.voice.setNoiseMode(mode);
+    // Update mic meter threshold visibility
+    if (mode === 'gate') {
+      this._updateMicMeterThreshold(parseInt(nsSlider.value, 10));
+    } else {
+      this._updateMicMeterThreshold(0);
+    }
+  });
+
+  nsSlider.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    if (this.voice && this.voice.inVoice) {
+      this.voice.setNoiseSensitivity(val);
+    }
+    localStorage.setItem('haven_ns_value', val);
+    this._updateMicMeterThreshold(val);
+  });
+
+  // Restore saved gate sensitivity
+  const savedNsVal = localStorage.getItem('haven_ns_value');
+  if (savedNsVal !== null) nsSlider.value = savedNsVal;
+
+  // ── Mic level meter ──
+  this._micMeterFill = document.getElementById('mic-meter-fill');
+  this._micMeterThreshold = document.getElementById('mic-meter-threshold');
+  this._micMeterRAF = null;
+  this._updateMicMeterThreshold(savedNoiseMode === 'gate' ? parseInt(nsSlider.value, 10) : 0);
+  this._startMicMeter();
+
+  // ── Screen share quality dropdowns ──
+  const screenResSelect = document.getElementById('screen-res-select');
+  const screenFpsSelect = document.getElementById('screen-fps-select');
+  if (screenResSelect) {
+    // Restore saved value (0 = "source")
+    const savedRes = localStorage.getItem('haven_screen_res') || '1080';
+    screenResSelect.value = savedRes === '0' ? 'source' : savedRes;
+    screenResSelect.addEventListener('change', (e) => {
+      const val = e.target.value === 'source' ? 0 : parseInt(e.target.value, 10);
+      this.voice.setScreenResolution(val);
+    });
+  }
+  if (screenFpsSelect) {
+    const savedFps = localStorage.getItem('haven_screen_fps') || '30';
+    screenFpsSelect.value = savedFps;
+    screenFpsSelect.addEventListener('change', (e) => {
+      this.voice.setScreenFrameRate(parseInt(e.target.value, 10));
+    });
+  }
+
+  // In SFU (large-room) mode, screen share / webcam aren't available yet.
+  this.voice.onSfuFeatureBlocked = (feature) =>
+    this._showToast((t('voice.sfu_feature_blocked', { feature }) || `${feature} isn't available in large (SFU) voice rooms yet`), 'error');
+  // Wire up the voice manager's video callback
+  this.voice.onScreenStream = (userId, stream) => this._handleScreenStream(userId, stream);
+  // Wire up webcam video callback
+  this.voice.onWebcamStream = (userId, stream) => this._handleWebcamStream(userId, stream);
+  // Wire up screen share audio callback
+  this.voice.onScreenAudio = (userId) => this._handleScreenAudio(userId);
+  // Wire up no-audio indicator for streams without audio
+  this.voice.onScreenNoAudio = (userId) => this._handleScreenNoAudio(userId);
+
+  // Wire up voice join/leave audio cues + Desktop OS notifications
+  this.voice.onVoiceJoin = (userId, username) => {
+    this.notifications.playDirect('voice_join');
+    if (window.havenDesktop?.notify && userId !== this.user?.id && this.notifications.popupAllowed()) {
+      const name = this._getNickname(userId, username) || username;
+      window.havenDesktop.notify('Voice', `${name} joined voice`, { silent: true });
+    }
+  };
+  this.voice.onVoiceLeave = (userId, username) => {
+    this.notifications.playDirect('voice_leave');
+    if (window.havenDesktop?.notify && userId !== this.user?.id && this.notifications.popupAllowed()) {
+      const name = this._getNickname(userId, username) || username;
+      window.havenDesktop.notify('Voice', `${name} left voice`, { silent: true });
+    }
+  };
+  // Wire up screen share start audio cue
+  this.voice.onScreenShareStarted = (userId, username) => {
+    this.notifications.playDirect('stream_start');
+  };
+
+  // Clear the per-sharer renegotiation budget when they deliberately start a
+  // new share, so the loop guard from #5426 does not carry a spent budget
+  // over from a previous stream.
+  this.voice.onScreenShareRestart = (userId) => {
+    if (this._renegBudget) delete this._renegBudget[userId];
+  };
+
+  // Wire up AFK auto-move
+  this.voice.onAfkMove = (channelCode) => {
+    this._showToast('Moved to AFK sub-channel due to inactivity', 'info');
+    this._updateVoiceButtons(false);
+    this._updateVoiceStatus(false);
+    this._updateVoiceBar();
+    // Switch to the AFK channel and rejoin voice there
+    this.switchChannel(channelCode);
+    setTimeout(() => this._joinVoice(), 500);
+  };
+
+  // Wire up voice-kicked (joined from another client/tab)
+  this.voice.onVoiceKicked = (channelCode, reason) => {
+    this._showToast(reason || 'Voice disconnected — joined from another client', 'info');
+    this._updateVoiceButtons(false);
+    this._updateVoiceStatus(false);
+    this._updateVoiceBar();
+  };
+  // Re-render voice user list when webcam status changes
+  this.voice.onWebcamStatusChange = () => {
+    if (this._lastVoiceUsers) this._renderVoiceUsers(this._lastVoiceUsers);
+  };
+
+  // Surface a STUN/connectivity failure so external-network users aren't left
+  // staring at "ICE: Connecting..." with no clue why (#5399).
+  this.voice.onConnectivityWarning = (msg) => {
+    this._showToast(msg, 'error', null, 12000);
+  };
+
+  // Wire up talking indicator
+  this.voice.onTalkingChange = (userId, isTalking) => {
+    const resolvedId = userId === 'self' ? this.user.id : userId;
+    document.querySelectorAll(`.channel-voice-user[data-user-id="${resolvedId}"], .voice-user-item[data-user-id="${resolvedId}"]`).forEach(el => {
+      el.classList.toggle('talking', isTalking);
+    });
+    // Speaking counts as activity — reset idle timer so presence stays online
+    // and the server gets a voice-activity ping for AFK tracking
+    if (userId === 'self' && isTalking) this._resetIdle?.();
+  };
+
+  // Watch for the voice UI drifting out of step with the actual session
+  // (see _reconcileVoiceUi) and repair it instead of stranding the user on a
+  // "Join Voice" button while they're still in the call.
+  this._startVoiceUiReconciler?.();
+
+  // ── File video fullscreen: redirect to wrapper for proper controls ──
+  // When a .file-video triggers fullscreen (via native controls), intercept and
+  // fullscreen the .file-video-wrap parent instead so controls stay visible.
+  if (!document.documentElement.hasAttribute('data-desktop-app')) {
+    // Web-only: Desktop app has its own shim in app-preload.js
+    const origRequestFS = Element.prototype.requestFullscreen;
+    Element.prototype.requestFullscreen = function (opts) {
+      if (this.classList?.contains('file-video')) {
+        const wrap = this.closest('.file-video-wrap');
+        if (wrap) return origRequestFS.call(wrap, opts);
+      }
+      return origRequestFS.call(this, opts);
+    };
+  }
+
+  // Search — the panel/cache/pager live in app-search.js. Here we just wire
+  // the header input to it. The panel persists across channel switches and
+  // only closes on its own X (or this input's close button).
+  this._searchInit();
+  let searchTimeout = null;
+  document.getElementById('search-toggle-btn').addEventListener('click', () => {
+    this._searchToggle();
+  });
+  document.getElementById('search-close-btn').addEventListener('click', () => {
+    this._searchClose();
+  });
+  document.getElementById('search-input').addEventListener('input', (e) => {
+    clearTimeout(searchTimeout);
+    const q = e.target.value.trim();
+    // DMs match substrings locally (2 chars is fine); public search uses the
+    // server tokenizer's minimum (trigram needs 3). (search-overhaul phase 2)
+    const ch = (this.channels || []).find(c => c.code === this.currentChannel);
+    const min = (ch && ch.is_dm) ? 2 : (this._searchMinChars || 2);
+    if (q.length >= min && this.currentChannel) {
+      searchTimeout = setTimeout(() => this._searchRun(q), 400);
+    } else if (!q) {
+      document.getElementById('search-panel').style.display = 'none';
+    }
+  });
+  document.getElementById('search-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') this._searchClose();
+    else if (e.key === 'Enter') {
+      const q = e.target.value.trim();
+      if (q) { this._searchSaveRecent(q); this._searchRun(q); }
+    }
+  });
+
+  // Pinned messages panel
+  document.getElementById('pinned-toggle-btn').addEventListener('click', () => {
+    const panel = document.getElementById('pinned-panel');
+    if (panel.style.display === 'block') {
+      panel.style.display = 'none';
+    } else if (this.currentChannel) {
+      this.socket.emit('get-pinned-messages', { code: this.currentChannel });
+    }
+  });
+  document.getElementById('pinned-close').addEventListener('click', () => {
+    document.getElementById('pinned-panel').style.display = 'none';
+  });
+
+  // Open pinned messages in fullscreen (maximized PiP)
+  const pinnedFullscreenBtn = document.getElementById('pinned-fullscreen-btn');
+  if (pinnedFullscreenBtn) pinnedFullscreenBtn.addEventListener('click', () => {
+    document.getElementById('pinned-panel').style.display = 'none';
+    this._openPinsPiP?.(this._lastPins || []);
+    const panel = document.getElementById('pins-pip-panel');
+    if (panel) panel.classList.add('pins-pip-maximized');
+  });
+
+  // Pop pinned messages out to the floating PiP panel
+  const pinnedPopupBtn = document.getElementById('pinned-popup-btn');
+  if (pinnedPopupBtn) pinnedPopupBtn.addEventListener('click', () => {
+    // Hide the sidebar panel first
+    document.getElementById('pinned-panel').style.display = 'none';
+    this._openPinsPiP?.(this._lastPins || []);
+  });
+
+  // Pins PiP: close button
+  const pinsPipClose = document.getElementById('pins-pip-close');
+  if (pinsPipClose) pinsPipClose.addEventListener('click', () => this._closePinsPiP?.());
+
+  // Pins PiP: fullscreen toggle button
+  const pinsPipFullscreen = document.getElementById('pins-pip-fullscreen');
+  if (pinsPipFullscreen) pinsPipFullscreen.addEventListener('click', () => {
+    const panel = document.getElementById('pins-pip-panel');
+    if (panel) panel.classList.toggle('pins-pip-maximized');
+  });
+
+  // Pins PiP: pop-in button — close PiP and re-open the sidebar panel
+  const pinsPipPopin = document.getElementById('pins-pip-popin');
+  if (pinsPipPopin) pinsPipPopin.addEventListener('click', () => {
+    this._closePinsPiP?.();
+    if (this.currentChannel) this.socket.emit('get-pinned-messages', { code: this.currentChannel });
+  });
+
+  // Pins PiP: delegated click handler for the pin list
+  // - Click on an item   → jump to message (PiP stays open)
+  // - Click on unpin btn → confirm modal + socket emit
+  const pinsPipList = document.getElementById('pins-pip-list');
+  if (pinsPipList) {
+    pinsPipList.addEventListener('click', async (e) => {
+      // Unpin button — handled first; stops propagation so item click doesn't also fire
+      const unpinBtn = e.target.closest('.pinned-unpin-btn');
+      if (unpinBtn) {
+        e.stopPropagation();
+        const msgId = parseInt(unpinBtn.dataset.msgId, 10);
+        if (!msgId) return;
+        const ok = await this._showConfirmModal?.(t('confirm.unpin_message'), '');
+        if (ok) this.socket.emit('unpin-message', { messageId: msgId });
+        return;
+      }
+      // Click anywhere else on a pinned item → jump to that message in the channel
+      const item = e.target.closest('.pinned-item');
+      if (item) {
+        const msgId = parseInt(item.dataset.msgId, 10);
+        if (msgId) this._jumpToMessage?.(msgId);
+      }
+    });
+  }
+
+  // ── Channel media gallery (#5350) ──
+  const galleryBtn = document.getElementById('gallery-toggle-btn');
+  if (galleryBtn) {
+    galleryBtn.addEventListener('click', () => {
+      if (!this.currentChannel) return;
+      const modal = document.getElementById('media-gallery-modal');
+      const body = document.getElementById('media-gallery-body');
+      body.innerHTML = `<div class="media-gallery-empty muted-text">${(window.t && t('media_gallery.loading')) || 'Loading…'}</div>`;
+      // Reset tab counts
+      ['photos','videos','audios','files','links'].forEach(k => {
+        const el = document.getElementById(`media-count-${k}`);
+        if (el) el.textContent = '0';
+      });
+      // Default to Photos tab
+      document.querySelectorAll('#media-gallery-modal .media-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === 'photos'));
+      this._mediaGalleryActiveTab = 'photos';
+      modal.style.display = 'flex';
+      this.socket.emit('get-channel-media', { code: this.currentChannel });
+    });
+  }
+  // ── Channel thread list (#5506) ──
+  const threadsBtn = document.getElementById('threads-toggle-btn');
+  if (threadsBtn) {
+    threadsBtn.addEventListener('click', () => {
+      if (!this.currentChannel) return;
+      const modal = document.getElementById('threads-list-modal');
+      const body = document.getElementById('threads-list-body');
+      const search = document.getElementById('threads-list-search');
+      this._threadListData = null;
+      if (search) search.value = '';
+      body.innerHTML = `<div class="media-gallery-empty muted-text">${(window.t && t('thread_list.loading')) || 'Loading…'}</div>`;
+      modal.style.display = 'flex';
+      this.socket.emit('get-channel-threads', { code: this.currentChannel });
+      // Opened by pointer, so focusing the filter is a convenience, not a trap.
+      if (search) setTimeout(() => search.focus(), 50);
+    });
+  }
+  const threadsClose = document.getElementById('threads-list-close');
+  if (threadsClose) threadsClose.addEventListener('click', () => {
+    document.getElementById('threads-list-modal').style.display = 'none';
+  });
+  const threadsModal = document.getElementById('threads-list-modal');
+  if (threadsModal) threadsModal.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  const threadsSearch = document.getElementById('threads-list-search');
+  if (threadsSearch) threadsSearch.addEventListener('input', () => {
+    // Filtering client-side: the list is already capped server-side, and a
+    // round trip per keystroke would be worse than filtering 500 rows.
+    this._renderThreadList(threadsSearch.value);
+  });
+  const threadsBody = document.getElementById('threads-list-body');
+  if (threadsBody) threadsBody.addEventListener('click', (e) => {
+    const row = e.target.closest('.thread-list-row');
+    if (!row) return;
+    const parentId = parseInt(row.dataset.parentId, 10);
+    if (!parentId) return;
+    document.getElementById('threads-list-modal').style.display = 'none';
+    // Jump first: _openThread reads the parent's author and preview out of the
+    // rendered message, so opening a thread whose root sits far up the channel
+    // would otherwise show an empty header.
+    this._jumpToMessage?.(parentId);
+    setTimeout(() => this._openThread?.(parentId), 150);
+  });
+
+  const galleryClose = document.getElementById('media-gallery-close');
+  if (galleryClose) galleryClose.addEventListener('click', () => {
+    document.getElementById('media-gallery-modal').style.display = 'none';
+  });
+  const galleryModal = document.getElementById('media-gallery-modal');
+  if (galleryModal) galleryModal.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  // Tab switching
+  document.querySelectorAll('#media-gallery-modal .media-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#media-gallery-modal .media-tab').forEach(b => b.classList.toggle('active', b === btn));
+      this._mediaGalleryActiveTab = btn.dataset.tab;
+      if (this._mediaGalleryData) this._renderMediaGalleryTab(this._mediaGalleryActiveTab);
+      // Switching tabs clears selection — selecting items across tabs and
+      // hitting Delete would be confusing since each tab has its own scope.
+      if (this._mediaGallerySelected) this._mediaGallerySelected.clear();
+      this._refreshMediaGalleryToolbar();
+    });
+  });
+
+  // ── Sort dropdown (#5375) ──
+  const sortSel = document.getElementById('media-gallery-sort');
+  if (sortSel) {
+    // Persist last-used sort so users don't have to re-pick it each session
+    try {
+      const saved = localStorage.getItem('mediaGallerySort');
+      if (saved) { sortSel.value = saved; this._mediaGallerySort = saved; }
+      else this._mediaGallerySort = 'date-desc';
+    } catch { this._mediaGallerySort = 'date-desc'; }
+    sortSel.addEventListener('change', () => {
+      this._mediaGallerySort = sortSel.value || 'date-desc';
+      try { localStorage.setItem('mediaGallerySort', this._mediaGallerySort); } catch {}
+      if (this._mediaGalleryData) this._renderMediaGalleryTab(this._mediaGalleryActiveTab || 'photos');
+    });
+  }
+
+  // ── Select / multi-delete bar (#5375) ──
+  const selToggle = document.getElementById('media-gallery-select-toggle');
+  const selAll    = document.getElementById('media-gallery-select-all');
+  const delBtn    = document.getElementById('media-gallery-delete');
+  if (selToggle) selToggle.addEventListener('click', () => {
+    this._mediaGallerySelectMode = !this._mediaGallerySelectMode;
+    if (!this._mediaGallerySelectMode && this._mediaGallerySelected) this._mediaGallerySelected.clear();
+    this._refreshMediaGalleryToolbar();
+    if (this._mediaGalleryData) this._renderMediaGalleryTab(this._mediaGalleryActiveTab || 'photos');
+  });
+  if (selAll) selAll.addEventListener('click', () => {
+    if (!this._mediaGalleryData || !this._mediaGallerySelectMode) return;
+    const tab = this._mediaGalleryActiveTab || 'photos';
+    if (tab === 'links') return; // not deletable
+    const items = this._mediaGalleryData[tab] || [];
+    const selected = this._mediaGallerySelected || (this._mediaGallerySelected = new Map());
+    // Toggle: if everything in this tab is already selected, clear; else add all
+    const allSelected = items.length > 0 && items.every(it => selected.has(this._mediaItemKey(it)));
+    if (allSelected) {
+      items.forEach(it => selected.delete(this._mediaItemKey(it)));
+    } else {
+      items.forEach(it => selected.set(this._mediaItemKey(it), { message_id: it.message_id, url: it.url }));
+    }
+    this._refreshMediaGalleryToolbar();
+    this._renderMediaGalleryTab(tab);
+  });
+  if (delBtn) delBtn.addEventListener('click', () => {
+    if (!this._mediaGallerySelected || this._mediaGallerySelected.size === 0) return;
+    if (!this.currentChannel) return;
+    const count = this._mediaGallerySelected.size;
+    const ok = confirm(
+      (window.t && t('media_gallery.confirm_delete', { count })) ||
+      `Delete ${count} selected item${count === 1 ? '' : 's'}? The underlying messages will be removed for everyone. This cannot be undone.`
+    );
+    if (!ok) return;
+    // Build messageIds (one delete per message — bulk endpoint dedupes
+    // server-side too). Group attachment URLs per message id so E2E DM
+    // attachments can be moved to deleted-attachments/ even though the
+    // server can't read the ciphertext.
+    const messageIds = [];
+    const attachmentsByMessage = {};
+    for (const { message_id, url } of this._mediaGallerySelected.values()) {
+      if (!messageIds.includes(message_id)) messageIds.push(message_id);
+      if (!attachmentsByMessage[message_id]) attachmentsByMessage[message_id] = [];
+      if (url && url.startsWith('/uploads/')) attachmentsByMessage[message_id].push(url);
+    }
+    delBtn.disabled = true;
+    this.socket.emit('delete-channel-media', {
+      code: this.currentChannel,
+      messageIds,
+      attachmentsByMessage,
+    }, (res) => {
+      delBtn.disabled = false;
+      if (!res || res.error) {
+        if (this._showToast) this._showToast(res?.error || 'Delete failed', 'error');
+        else alert(res?.error || 'Delete failed');
+        return;
+      }
+      if (this._showToast) this._showToast(`Deleted ${res.deleted || 0}${res.skipped ? ` (${res.skipped} skipped)` : ''}`, 'info');
+      // Clear selection, exit select mode, and refresh data
+      if (this._mediaGallerySelected) this._mediaGallerySelected.clear();
+      this._mediaGallerySelectMode = false;
+      this._refreshMediaGalleryToolbar();
+      this.socket.emit('get-channel-media', { code: this.currentChannel });
+    });
+  });
+
+  // Right sidebar collapse toggle (persisted to localStorage)
+  const sidebarToggle = document.getElementById('sidebar-toggle-btn');
+  const rightSidebar = document.getElementById('right-sidebar');
+
+  function applySidebarCollapsed(collapsed) {
+    rightSidebar.classList.toggle('collapsed', collapsed);
+    sidebarToggle.classList.toggle('is-collapsed', collapsed);
+    sidebarToggle.textContent = collapsed ? '\u276E' : '\u276F'; // ❮ or ❯
+    window._updateSbToggleRight?.();
+  }
+  // Exposed so the search panel can temporarily un-collapse the sidebar it
+  // overlays, then restore the user's preference on close. (search-overhaul)
+  this._applySidebarCollapsed = applySidebarCollapsed;
+
+  // Default is expanded; only collapse if explicitly saved as '1'
+  applySidebarCollapsed(localStorage.getItem('haven-sidebar-collapsed') === '1');
+
+  sidebarToggle.addEventListener('click', () => {
+    const collapsed = !rightSidebar.classList.contains('collapsed');
+    applySidebarCollapsed(collapsed);
+    localStorage.setItem('haven-sidebar-collapsed', collapsed ? '1' : '0');
+  });
+
+  // E2E lock menu dropdown toggle
+  document.getElementById('e2e-menu-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const dd = document.getElementById('e2e-dropdown');
+    dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  });
+  // Close dropdown on outside click
+  document.addEventListener('click', () => {
+    const dd = document.getElementById('e2e-dropdown');
+    if (dd) dd.style.display = 'none';
+  });
+  document.getElementById('e2e-dropdown')?.addEventListener('click', (e) => e.stopPropagation());
+
+  // E2E verification code button (inside dropdown)
+  document.getElementById('e2e-verify-btn')?.addEventListener('click', () => {
+    document.getElementById('e2e-dropdown').style.display = 'none';
+    this._requireE2E(() => this._showE2EVerification());
+  });
+
+  // E2E recover-from-backup button — re-fetches the server-side encrypted
+  // backup and unwraps it with the user's password. Works even when the
+  // local key is in ghost-state or IndexedDB is stale. Does NOT generate
+  // new keys, so existing encrypted messages remain readable once recovered.
+  document.getElementById('e2e-recover-btn')?.addEventListener('click', () => {
+    document.getElementById('e2e-dropdown').style.display = 'none';
+    this._recoverE2EFromBackup();
+  });
+
+  // E2E reset encryption keys button (inside dropdown)
+  // Reset does NOT go through _requireE2E — it must work even when E2E
+  // can't initialize (e.g. server backup can't be decrypted after password change).
+  document.getElementById('e2e-reset-btn')?.addEventListener('click', () => {
+    document.getElementById('e2e-dropdown').style.display = 'none';
+    this._showE2EResetConfirmation();
+  });
+
+  // E2E password prompt modal handlers
+  document.getElementById('e2e-pw-submit-btn')?.addEventListener('click', () => this._submitE2EPassword());
+  document.getElementById('e2e-pw-cancel-btn')?.addEventListener('click', () => this._closeE2EPasswordModal());
+  document.getElementById('e2e-pw-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') this._submitE2EPassword();
+  });
+  document.getElementById('e2e-password-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'e2e-password-modal') this._closeE2EPasswordModal();
+  });
+
+  // Rate limit tracking for E2E password prompt
+  this._e2ePwAttempts = [];
+  this._e2ePwLocked = false;
+  this._e2ePwPendingAction = null;
+
+  // Global keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Type-to-focus: start typing anywhere and the message box takes over.
+    // No preventDefault, so the browser inserts the keystroke into the newly
+    // focused textarea — nothing is dropped.
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing) {
+      const ae = document.activeElement;
+      const tag = ae?.tagName;
+      const editing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || ae?.isContentEditable;
+      // getClientRects().length is 0 for hidden elements, incl. fixed overlays
+      const popupOpen = [...document.querySelectorAll(
+        '.modal-overlay, #quick-switcher-overlay, #theme-popup, #search-container, .context-menu'
+      )].some(el => el.getClientRects().length > 0);
+      const msgInput = document.getElementById('message-input');
+      const msgArea = document.getElementById('message-area');
+      if (!editing && !popupOpen && this.currentChannel && msgInput && msgArea && msgArea.style.display !== 'none') {
+        msgInput.focus();
+      }
+    }
+
+    // Ctrl+F = search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f' && this.currentChannel) {
+      e.preventDefault();
+      const sc = document.getElementById('search-container');
+      sc.style.display = 'flex';
+      document.getElementById('search-input').focus();
+    }
+    // Ctrl+K = quick channel switcher
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      this._openQuickSwitcher();
+    }
+    // Ctrl+E = toggle emoji picker (open/close)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'e' && this.currentChannel) {
+      e.preventDefault();
+      this._emojiPickerContext = 'main';
+      this._toggleEmojiPicker();
+    }
+    // Alt+ArrowUp/Down = navigate channels
+    if (e.altKey && !e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      this._navigateChannel(e.key === 'ArrowUp' ? -1 : 1);
+    }
+    // Alt+Shift+ArrowUp/Down = navigate to next/prev unread channel
+    if (e.altKey && e.shiftKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      e.preventDefault();
+      this._navigateUnreadChannel(e.key === 'ArrowUp' ? -1 : 1);
+    }
+    // Escape = close modals, search, theme popup, quick switcher
+    if (e.key === 'Escape') {
+      document.getElementById('search-container').style.display = 'none';
+      document.getElementById('search-panel').style.display = 'none';
+      document.getElementById('theme-popup').style.display = 'none';
+      document.getElementById('quick-switcher-overlay')?.remove();
+      document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
+      // Close the emoji picker too. Reuse its toggle so the parent/anchor
+      // restore runs, and only when it's open so Escape can't open it.
+      const emojiPicker = document.getElementById('emoji-picker');
+      if (emojiPicker && emojiPicker.style.display === 'flex') this._toggleEmojiPicker();
+      // Close the GIF picker too, matching the emoji picker's Escape behavior.
+      const gifPicker = document.getElementById('gif-picker');
+      if (gifPicker && gifPicker.style.display === 'flex') gifPicker.style.display = 'none';
+    }
+  });
+
+  // Escape (no modifiers) with nothing else to close → jump to the latest
+  // message, same as the jump-to-bottom button. Runs in the CAPTURE phase so it
+  // inspects overlays/dropdowns *before* the bubble-phase handlers above (and
+  // the message-input dropdown handlers) close them. If any closeable UI is
+  // open we bail and let those handlers run, so Escape never both dismisses a
+  // popup and jumps. Gated on an active channel with the message view visible.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+    if (!this.currentChannel) return;
+    const msgArea = document.getElementById('message-area');
+    if (!msgArea || msgArea.style.display === 'none') return;
+    // An in-progress message edit owns Escape (it cancels the edit) and its
+    // handler sits on the textarea in the bubble phase, so this capture-phase
+    // listener would otherwise scroll away from — or, on a trimmed window,
+    // re-render out of existence — the box being typed into. Editing an old
+    // message is exactly the scrolled-up case, so check it first.
+    if (document.querySelector('.edit-textarea')) return;
+    // getClientRects().length is 0 for hidden/display:none nodes — same popup
+    // detection the type-to-focus guard uses above.
+    // The PiP DM, thread and pins panels each own Escape for their own input;
+    // jumping the main channel behind them is never what was meant. MSG Arena's
+    // context menu is .channel-ctx-menu — there is no .context-menu element.
+    const somethingOpen = [...document.querySelectorAll(
+      '.modal-overlay, #quick-switcher-overlay, #theme-popup, #search-container, ' +
+      '#search-panel, #image-lightbox, .image-lightbox, #emoji-picker, ' +
+      '#gif-picker, .channel-ctx-menu, #emoji-dropdown, #slash-dropdown, ' +
+      '#mention-dropdown, #channel-dropdown, #persona-dropdown, #ferry-dropdown, #gif-slash-picker, ' +
+      '#dm-pip-panel, #thread-panel, #pins-pip-panel'
+    )].some(el => el.getClientRects().length > 0);
+    if (somethingOpen) return;
+    this._jumpToLatest();
+  }, true);
+
+  // Theme popup toggle
+  document.getElementById('theme-popup-toggle')?.addEventListener('click', () => {
+    const popup = document.getElementById('theme-popup');
+    popup.style.display = popup.style.display === 'none' ? 'block' : 'none';
+  });
+  document.getElementById('theme-popup-close')?.addEventListener('click', () => {
+    document.getElementById('theme-popup').style.display = 'none';
+  });
+
+  // Logout
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    if (this.voice && this.voice.inVoice) this.voice.leave();
+    this._clearChannelCodeMap?.();
+    localStorage.removeItem('haven_token');
+    localStorage.removeItem('haven_user');
+    localStorage.removeItem('haven_sync_key');
+    window.location.href = '/';
+  });
+
+  // ── Games / Activities system ─────────────────────────────
+  // Registry of available games — add new games here
+  this._gamesRegistry = [
+    { id: 'flappy', name: 'Shippy Container', icon: '🚢', path: '/games/flappy.html', description: 'Dodge containers, chase high scores!' },
+    { id: 'flight', name: 'Flight', icon: '✈️', path: '/games/flash.html?swf=/games/roms/flight-759879f9.swf&title=Flight', description: 'Throw a paper plane as far as you can!', type: 'flash' },
+    { id: 'learn-to-fly-3', name: 'Learn to Fly 3', icon: '🐧', path: '/games/flash.html?swf=/games/roms/learn-to-fly-3.swf&title=Learn%20to%20Fly%203', description: 'Help a penguin learn to fly!', type: 'flash' },
+    { id: 'bubble-tanks-3', name: 'Bubble Tanks 3', icon: '🫧', path: '/games/flash.html?swf=/games/roms/Bubble%20Tanks%203.swf&title=Bubble%20Tanks%203', description: 'Bubble-based arena shooter', type: 'flash' },
+    { id: 'tanks', name: 'Tanks', icon: '🪖', path: '/games/flash.html?swf=/games/roms/tanks.swf&title=Tanks', description: 'Classic Armor Games tank combat', type: 'flash' },
+    { id: 'super-smash-flash-2', name: 'Super Smash Flash 2', icon: '⚔️', path: '/games/flash.html?swf=/games/roms/SuperSmash.swf&title=Super%20Smash%20Flash%202', description: 'Fan-made Smash Bros platformer fighter', type: 'flash' },
+    { id: 'io-games', name: '.io Games', icon: '🌐', path: '/games/io-games.html', description: 'Browse popular .io multiplayer games', type: 'browser' },
+  ];
+
+  // Generic postMessage bridge for any game (scores + leaderboard)
+  if (!this._gameScoreListenerAdded) {
+    window.addEventListener('message', (e) => {
+      if (e.origin !== window.location.origin) return;
+      // Handle score submissions: { type: '<gameId>-score', score: N } or { type: 'game-score', game: '<id>', score: N }
+      if (e.data && typeof e.data.score === 'number') {
+        let gameId = null;
+        if (e.data.type === 'game-score' && e.data.game) {
+          gameId = e.data.game;
+        } else if (typeof e.data.type === 'string' && e.data.type.endsWith('-score')) {
+          gameId = e.data.type.replace(/-score$/, '');
+        }
+        if (gameId && /^[a-z0-9_-]{1,32}$/.test(gameId)) {
+          this.socket.emit('submit-high-score', { game: gameId, score: e.data.score });
+        }
+      }
+      // Handle leaderboard requests from game iframes/windows
+      if (e.data && e.data.type === 'get-leaderboard') {
+        const gid = e.data.game || 'flappy';
+        const scores = this.highScores?.[gid] || [];
+        const target = e.source || (this._gameIframe?.contentWindow);
+        try { target?.postMessage({ type: 'leaderboard-data', leaderboard: scores }, e.origin); } catch {}
+      }
+    });
+    this._gameScoreListenerAdded = true;
+  }
+
+  // Activities button → open launcher modal
+  document.getElementById('activities-btn')?.addEventListener('click', () => this._openActivitiesModal());
+
+  // Close activities modal
+  document.getElementById('close-activities-btn')?.addEventListener('click', () => this._closeActivitiesModal());
+  document.getElementById('activities-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'activities-modal') this._closeActivitiesModal();
+  });
+
+  // Game iframe controls
+  document.getElementById('game-iframe-close')?.addEventListener('click', () => this._closeGameIframe());
+  document.getElementById('game-iframe-popout')?.addEventListener('click', () => this._popoutGame());
+
+  // Game volume slider — forward volume changes into the game iframe
+  const gameVolSlider = document.getElementById('game-volume-slider');
+  const gameVolPct = document.getElementById('game-volume-pct');
+  if (gameVolSlider) {
+    gameVolSlider.addEventListener('input', () => {
+      const val = parseInt(gameVolSlider.value);
+      if (gameVolPct) gameVolPct.textContent = val + '%';
+      // Post volume message into the game iframe
+      try {
+        const iframe = document.getElementById('game-iframe');
+        if (iframe?.contentWindow) {
+          iframe.contentWindow.postMessage({ type: 'set-volume', volume: val / 100 }, window.location.origin);
+        }
+      } catch {}
+    });
+  }
+
+  // Image click — open lightbox overlay (CSP-safe — no inline handlers)
+  document.getElementById('messages').addEventListener('click', (e) => {
+    // Concealed media (hidden image / unrevealed spoiler) intercepts the click
+    // before the lightbox opens.
+    if (this._maybeRevealConcealed(e)) return;
+    if (e.target.classList.contains('chat-image')) {
+      this._lightboxContainer = document.getElementById('messages');
+      this._openLightbox(e.target.src);
+    }
+    // Spoiler reveal toggle (text spoilers)
+    if (e.target.closest('.spoiler')) {
+      e.target.closest('.spoiler').classList.toggle('revealed');
+    }
+  });
+
+  // Image click in thread panel, DM PiP, and the search results panel — same
+  // lightbox with container-aware navigation, spoiler reveal, and image
+  // right-click menu. Search reuses this wholesale. (search-overhaul phase 3)
+  for (const containerId of ['thread-messages', 'dm-pip-messages', 'search-panel-list']) {
+    const el = document.getElementById(containerId);
+    if (el) {
+      el.addEventListener('click', (e) => {
+        if (this._maybeRevealConcealed(e)) return;
+        if (e.target.closest('.spoiler')) {
+          e.target.closest('.spoiler').classList.toggle('revealed');
+          return;
+        }
+        if (e.target.classList.contains('chat-image')) {
+          this._lightboxContainer = el;
+          this._openLightbox(e.target.src);
+        }
+      });
+      el.addEventListener('contextmenu', (e) => {
+        if (e.target.classList.contains('chat-image')) {
+          e.preventDefault();
+          this._showImageContextMenu(e, e.target.src);
+        }
+      });
+    }
+  }
+
+  // Image right-click — custom context menu for chat thumbnails
+  document.getElementById('messages').addEventListener('contextmenu', (e) => {
+    if (e.target.classList.contains('chat-image')) {
+      e.preventDefault();
+      this._showImageContextMenu(e, e.target.src);
+    }
+  });
+
+  // Message right-click — custom context menu (edit / reply / quote / pin / delete).
+  // Reuses the hover-toolbar actions; only opens over a real message row.
+  document.getElementById('messages').addEventListener('contextmenu', (e) => {
+    // Images have their own Save/Copy/Open menu (handled above) — leave them.
+    if (e.target.closest('.chat-image')) return;
+    // Inside the inline message-edit box, defer to the browser's native menu
+    // so spell-check suggestions work — none of our items apply while editing.
+    if (e.target.closest('.edit-textarea')) return;
+    // Don't hijack right-click while picking messages to move.
+    if (this._moveSelectionActive) return;
+    const msgEl = e.target.closest('.message, .message-compact');
+    if (!msgEl || !msgEl.dataset.msgId) return; // empty gutter / unsent rows → native menu
+    // Preserve native copy: if text is selected inside this message, defer.
+    const sel = window.getSelection?.();
+    if (sel && !sel.isCollapsed && msgEl.contains(sel.anchorNode)) return;
+    e.preventDefault();
+    this._showMessageContextMenu(e, msgEl);
+  });
+
+  // Risky file download warning — intercept clicks on potentially harmful files
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const link = e.target.closest('a.risky-file');
+    if (!link) return;
+    e.preventDefault();
+    const fileName = link.getAttribute('download') || 'this file';
+    const ext = fileName.split('.').pop().toLowerCase();
+    this._showRiskyDownloadWarning(fileName, ext, link.href);
+  });
+
+  // Masked markdown link warning — show URL confirmation before navigating
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const link = e.target.closest('a[data-masked-link]');
+    if (!link) return;
+    e.preventDefault();
+    this._showExternalLinkWarning(link.textContent, link.href);
+  });
+
+  // Reply banner click — scroll to the original message
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const banner = e.target.closest('.reply-banner');
+    if (!banner) return;
+    const replyMsgId = banner.dataset.replyMsgId;
+    if (!replyMsgId) return;
+    this._jumpToMessage(parseInt(replyMsgId, 10));
+  });
+
+  // #channel-name link click — switch to the referenced channel.
+  // Delegated globally so it works inside the main pane, thread panel, and
+  // DM PiP without per-container wiring.
+  document.addEventListener('click', (e) => {
+    const link = e.target.closest('.channel-link[data-channel-code]');
+    if (!link) return;
+    const code = link.dataset.channelCode;
+    if (!code) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const ch = (this.channels || []).find(c => c.code === code);
+    if (ch && ch.is_dm) {
+      this._openDMPiP?.(code);
+    } else {
+      this.switchChannel?.(code);
+    }
+  });
+
+  // Thread preview click — open thread panel
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const preview = e.target.closest('.thread-preview');
+    if (!preview) return;
+    const parentId = parseInt(preview.dataset.threadParent);
+    if (parentId) this._openThread(parentId);
+  });
+
+  // Thread panel — close, send
+  const threadCloseBtn = document.getElementById('thread-panel-close');
+  if (threadCloseBtn) threadCloseBtn.addEventListener('click', () => this._closeThread());
+
+  const threadPipBtn = document.getElementById('thread-panel-pip');
+  if (threadPipBtn) threadPipBtn.addEventListener('click', () => this._toggleThreadPiP());
+
+  // Thread @mention pill in the channel header
+  const tmPill = document.getElementById('thread-mentions-pill');
+  if (tmPill) tmPill.addEventListener('click', () => this._openMostRecentThreadMention?.());
+
+  // DM PiP panel buttons
+  const dmPipClose = document.getElementById('dm-pip-close');
+  if (dmPipClose) dmPipClose.addEventListener('click', () => this._closeDMPiP?.());
+  const dmPipFs = document.getElementById('dm-pip-fullscreen');
+  if (dmPipFs) dmPipFs.addEventListener('click', () => {
+    const code = this._activeDMPip;
+    if (!code) return;
+    this._closeDMPiP?.();
+    this.switchChannel(code);
+  });
+  const dmPipSend = document.getElementById('dm-pip-send');
+  if (dmPipSend) dmPipSend.addEventListener('click', () => this._sendDMPiPMessage?.());
+  const dmPipInput = document.getElementById('dm-pip-input');
+  if (dmPipInput) dmPipInput.addEventListener('keydown', (e) => {
+    // Autocomplete navigation/insert hijacks first. (#5296)
+    if (this._handleAutocompleteKeydown(e)) return;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      this._sendDMPiPMessage?.();
+    }
+  });
+  if (dmPipInput) dmPipInput.addEventListener('input', () => {
+    this._checkMentionTrigger(dmPipInput);
+    this._checkChannelTrigger(dmPipInput);
+    this._checkEmojiTrigger(dmPipInput);
+    this._checkSlashTrigger(dmPipInput);
+    // Personas are not supported in DMs — omit _checkPersonaTrigger here
+  });
+
+  // Paste images / files into the DM PiP input — queues images for preview
+  // (same as main channel paste behavior). (#5324)
+  if (dmPipInput) dmPipInput.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const targetCode = this._activeDMPip;
+    if (!targetCode) return;
+    for (const item of items) {
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (!file) continue;
+        e.preventDefault();
+        if (item.type.startsWith('image/')) {
+          this._queueImageForPiP(file, targetCode);
+        } else {
+          this._uploadGeneralFile(file, targetCode);
+        }
+        return;
+      }
+    }
+  });
+
+  // PiP emoji button — positions the picker above the button and targets the PiP input
+  const dmPipEmojiBtn = document.getElementById('dm-pip-emoji-btn');
+  if (dmPipEmojiBtn) {
+    dmPipEmojiBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._activeEditTextarea = document.getElementById('dm-pip-input');
+      this._emojiPickerContext = 'dmpip';
+      this._toggleEmojiPicker(dmPipEmojiBtn);
+    });
+  }
+
+  const dmPipReplyClose = document.getElementById('dm-pip-reply-close-btn');
+  if (dmPipReplyClose) dmPipReplyClose.addEventListener('click', () => this._clearDMPiPReply?.());
+
+  // Delegated message-action handler for the DM PiP.  Mirrors the main
+  // #messages handler so reactions/reply/edit/etc. work inside the PiP.
+  const dmPipMessages = document.getElementById('dm-pip-messages');
+  if (dmPipMessages) {
+    dmPipMessages.addEventListener('click', async (e) => {
+      // Toolbar action buttons
+      // Inline ⋯ dots button — reveals the full toolbar (touch/mobile)
+      const dotsBtn = e.target.closest('.msg-dots-btn');
+      if (dotsBtn) {
+        e.stopPropagation();
+        const msgEl = dotsBtn.closest('.message, .message-compact');
+        if (!msgEl) return;
+        const wasSelected = msgEl.classList.contains('msg-selected');
+        dmPipMessages.querySelectorAll('.msg-selected').forEach(el => {
+          el.classList.remove('msg-selected');
+          const tb = el.querySelector('.msg-toolbar');
+          if (tb) tb.style.removeProperty('display');
+        });
+        if (!wasSelected) {
+          msgEl.classList.add('msg-selected');
+          const tb = msgEl.querySelector('.msg-toolbar');
+          if (tb) tb.style.setProperty('display', 'flex', 'important');
+        }
+        return;
+      }
+
+      const actionBtn = e.target.closest('[data-action]');
+      if (actionBtn) {
+        const msgEl = actionBtn.closest('.message, .message-compact');
+        if (!msgEl) return;
+        const msgId = parseInt(msgEl.dataset.msgId, 10);
+        if (!msgId) return;
+        const action = actionBtn.dataset.action;
+        if (action === 'react') {
+          this._showReactionPicker?.(msgEl, msgId);
+        } else if (action === 'reply') {
+          this._setDMPiPReply?.(msgEl, msgId);
+        } else if (action === 'quote') {
+          this._quoteDMPiPMessage?.(msgEl);
+        } else if (action === 'edit') {
+          this._startEditMessage?.(msgEl, msgId);
+        } else if (action === 'delete') {
+          if (await this._showConfirmModal(t('confirm.delete_message'), '', { danger: true, confirmLabel: t('msg_toolbar.delete') })) {
+            this.socket.emit('delete-message', { messageId: msgId, channelCode: this._activeDMPip, attachments: this._getMessageAttachments?.(msgId) });
+          }
+        } else if (action === 'pin') {
+          if (await this._showConfirmModal(t('confirm.pin_message'), '')) {
+            this.socket.emit('pin-message', { messageId: msgId });
+          }
+        } else if (action === 'unpin') {
+          this.socket.emit('unpin-message', { messageId: msgId });
+        } else if (action === 'archive') {
+          this.socket.emit('archive-message', { messageId: msgId });
+        } else if (action === 'unarchive') {
+          this.socket.emit('unarchive-message', { messageId: msgId });
+        } else if (action === 'copy-link') {
+          this._copyChannelLink?.(this._activeDMPip, msgId);
+        } else if (action === 'thread') {
+          // Threads are not available in DMs - swallow the click. The button
+          // should already be filtered out at render time, this is defence
+          // in depth in case an old cached element is still around.
+          this._showToast?.('Threads are not available in DMs', 'info');
+        }
+        return;
+      }
+      // Reaction badge toggle
+      const badge = e.target.closest('.reaction-badge');
+      if (badge) {
+        this._hideReactionPopout?.();
+        const msgEl = badge.closest('.message, .message-compact');
+        if (!msgEl) return;
+        const msgId = parseInt(msgEl.dataset.msgId, 10);
+        const emoji = badge.dataset.emoji;
+        if (!msgId || !emoji) return;
+        if (badge.classList.contains('own')) {
+          this.socket.emit('remove-reaction', { messageId: msgId, emoji });
+        } else {
+          this.socket.emit('add-reaction', { messageId: msgId, emoji });
+        }
+        return;
+      }
+      // Reply banner click → jump to original (within the PiP if present)
+      const replyBanner = e.target.closest('.reply-banner');
+      if (replyBanner) {
+        const replyMsgId = parseInt(replyBanner.dataset.replyMsgId || '', 10);
+        if (!replyMsgId) return;
+        const target = dmPipMessages.querySelector(`[data-msg-id="${replyMsgId}"]`);
+        if (target) {
+          target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          target.classList.add('highlight-flash');
+          setTimeout(() => target.classList.remove('highlight-flash'), 1200);
+        }
+      }
+    });
+  }
+
+  const threadSendBtn = document.getElementById('thread-send-btn');
+  if (threadSendBtn) threadSendBtn.addEventListener('click', () => this._sendThreadMessage());
+
+  // Thread emoji button — positions the picker above the button and targets the thread input
+  const threadEmojiBtn = document.getElementById('thread-emoji-btn');
+  if (threadEmojiBtn) {
+    threadEmojiBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._activeEditTextarea = document.getElementById('thread-input');
+      this._emojiPickerContext = 'thread';
+      this._toggleEmojiPicker(threadEmojiBtn);
+    });
+  }
+
+  const threadInput = document.getElementById('thread-input');
+  if (threadInput) {
+    threadInput.addEventListener('keydown', (e) => {
+      // Autocomplete navigation/insert hijacks first. (#5296)
+      if (this._handleAutocompleteKeydown(e)) return;
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this._sendThreadMessage();
+      }
+    });
+    threadInput.addEventListener('input', () => {
+      this._checkMentionTrigger(threadInput);
+      this._checkChannelTrigger(threadInput);
+      this._checkEmojiTrigger(threadInput);
+      this._checkSlashTrigger(threadInput);
+      // Personas are not supported in threads — omit _checkPersonaTrigger here
+    });
+    // Paste images / files into the thread input — upload then send as thread message
+    threadInput.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      if (!this._activeThreadParent) return;
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (!file) continue;
+          e.preventDefault();
+          // Hold it, don't post it. Flushed on send. (#thread-paste-instant)
+          this._queueThreadFile(file);
+          return;
+        }
+      }
+    });
+
+    // Drag & drop parity with the other composers — queue, never insta-post.
+    const threadArea = threadInput.closest('.thread-input-area') || threadInput;
+    threadArea.addEventListener('dragover', (e) => { e.preventDefault(); threadArea.classList.add('drag-over'); });
+    threadArea.addEventListener('dragleave', () => threadArea.classList.remove('drag-over'));
+    threadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      threadArea.classList.remove('drag-over');
+      if (!this._activeThreadParent) return;
+      const file = e.dataTransfer?.files[0];
+      if (file) this._queueThreadFile(file);
+    });
+  }
+
+  const threadReplyCloseBtn = document.getElementById('thread-reply-close-btn');
+  if (threadReplyCloseBtn) threadReplyCloseBtn.addEventListener('click', () => this._clearThreadReply());
+
+  // Thread panel width resize (drag left edge)
+  const threadPanel = document.getElementById('thread-panel');
+  const threadResizer = document.getElementById('thread-panel-resizer');
+  if (threadPanel) {
+    const savedWidth = parseInt(localStorage.getItem('haven_thread_panel_width') || '', 10);
+    if (Number.isFinite(savedWidth) && savedWidth >= 300 && savedWidth <= 920) {
+      threadPanel.style.width = `${savedWidth}px`;
+    }
+  }
+  if (threadPanel && threadResizer) {
+    let resizing = false;
+    const clampWidth = (w) => {
+      const min = 300;
+      const max = Math.min(920, window.innerWidth - 220);
+      return Math.max(min, Math.min(max, w));
+    };
+    const onMove = (e) => {
+      if (!resizing || threadPanel.classList.contains('pip')) return;
+      const width = clampWidth(window.innerWidth - e.clientX);
+      threadPanel.style.width = `${width}px`;
+    };
+    const onUp = () => {
+      if (!resizing) return;
+      resizing = false;
+      document.body.classList.remove('resizing-thread-panel');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      const current = parseInt(threadPanel.style.width || '', 10);
+      if (Number.isFinite(current)) {
+        localStorage.setItem('haven_thread_panel_width', String(clampWidth(current)));
+      }
+    };
+    threadResizer.addEventListener('mousedown', (e) => {
+      if (threadPanel.classList.contains('pip')) return;
+      resizing = true;
+      e.preventDefault();
+      document.body.classList.add('resizing-thread-panel');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    window.addEventListener('resize', () => {
+      if (threadPanel.classList.contains('pip')) return;
+      const current = parseInt(threadPanel.style.width || '', 10);
+      if (!Number.isFinite(current)) return;
+      const width = clampWidth(current);
+      if (width !== current) {
+        threadPanel.style.width = `${width}px`;
+        localStorage.setItem('haven_thread_panel_width', String(width));
+      }
+    });
+  }
+
+  // Thread panel PiP drag (drag by header)
+  if (threadPanel) {
+    const threadHeaderTop = threadPanel.querySelector('.thread-panel-header-top');
+    let draggingPiP = false;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    const footerOffset = () => {
+      const raw = getComputedStyle(document.body).getPropertyValue('--thread-footer-offset');
+      const v = parseInt(raw, 10);
+      return Number.isFinite(v) ? v : 0;
+    };
+
+    const clampPiPRect = (left, top, width, height) => {
+      const maxLeft = Math.max(0, window.innerWidth - width);
+      const maxTop = Math.max(0, window.innerHeight - footerOffset() - height);
+      return {
+        left: Math.max(0, Math.min(maxLeft, left)),
+        top: Math.max(0, Math.min(maxTop, top))
+      };
+    };
+
+    const savePiPRect = () => {
+      if (!threadPanel.classList.contains('pip')) return;
+      const r = threadPanel.getBoundingClientRect();
+      const rect = {
+        left: Math.round(r.left),
+        top: Math.round(r.top),
+        width: Math.round(r.width),
+        height: Math.round(r.height)
+      };
+      localStorage.setItem('haven_thread_panel_pip_rect', JSON.stringify(rect));
+    };
+
+    const onPiPMove = (e) => {
+      if (!draggingPiP || !threadPanel.classList.contains('pip')) return;
+      const r = threadPanel.getBoundingClientRect();
+      const rawLeft = e.clientX - dragOffsetX;
+      const rawTop = e.clientY - dragOffsetY;
+      const pos = clampPiPRect(rawLeft, rawTop, r.width, r.height);
+      threadPanel.style.left = `${pos.left}px`;
+      threadPanel.style.top = `${pos.top}px`;
+      threadPanel.style.right = 'auto';
+      threadPanel.style.bottom = 'auto';
+    };
+
+    const onPiPUp = () => {
+      if (!draggingPiP) return;
+      draggingPiP = false;
+      document.removeEventListener('mousemove', onPiPMove);
+      document.removeEventListener('mouseup', onPiPUp);
+      savePiPRect();
+    };
+
+    if (threadHeaderTop) {
+      threadHeaderTop.addEventListener('mousedown', (e) => {
+        if (!threadPanel.classList.contains('pip')) return;
+        if (e.target.closest('button, input, textarea, a')) return;
+        const r = threadPanel.getBoundingClientRect();
+        draggingPiP = true;
+        dragOffsetX = e.clientX - r.left;
+        dragOffsetY = e.clientY - r.top;
+        threadPanel.style.right = 'auto';
+        threadPanel.style.bottom = 'auto';
+        e.preventDefault();
+        document.addEventListener('mousemove', onPiPMove);
+        document.addEventListener('mouseup', onPiPUp);
+      });
+    }
+
+    if (window.ResizeObserver) {
+      const observer = new ResizeObserver(() => {
+        if (!threadPanel.classList.contains('pip')) return;
+        clearTimeout(this._threadPiPSaveTimer);
+        this._threadPiPSaveTimer = setTimeout(() => {
+          const r = threadPanel.getBoundingClientRect();
+          const pos = clampPiPRect(r.left, r.top, r.width, r.height);
+          threadPanel.style.left = `${pos.left}px`;
+          threadPanel.style.top = `${pos.top}px`;
+          savePiPRect();
+        }, 80);
+      });
+      observer.observe(threadPanel);
+    }
+  }
+
+  // PiP input area height resize — drag the top handle upward to expand the textarea.
+  // Used by DM PiP, thread input, AND the main channel composer (#5327).
+  // We set both `height` and `min-height` inline so the auto-grow `input`
+  // handler (which sets `height = 'auto'` then caps at a small default) can't
+  // collapse the textarea back down after the user has manually expanded it.
+  document.querySelectorAll('.pip-input-resizer').forEach(handle => {
+    let startY = 0;
+    let startHeight = 0;
+    let ta = null;
+    let cap = 600;
+
+    const onMove = (e) => {
+      if (!ta) return;
+      const delta = startY - e.clientY; // positive when dragging up
+      const newHeight = Math.max(34, Math.min(cap, startHeight + delta));
+      ta.style.height = `${newHeight}px`;
+      ta.style.minHeight = `${newHeight}px`;
+      ta.style.maxHeight = `${cap}px`;
+    };
+
+    const onUp = () => {
+      ta = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    handle.addEventListener('mousedown', (e) => {
+      ta = handle.parentElement?.querySelector('textarea');
+      if (!ta) return;
+      startY = e.clientY;
+      startHeight = ta.getBoundingClientRect().height;
+      // Cap manual expansion at ~60% of viewport so the textarea can never
+      // swallow the entire chat pane. Min 200px on tiny windows.
+      cap = Math.max(200, Math.floor(window.innerHeight * 0.6));
+      e.preventDefault();
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  });
+
+  // Emoji picker toggle
+  document.getElementById('emoji-btn').addEventListener('click', () => {
+    this._emojiPickerContext = 'main';
+    this._toggleEmojiPicker();
+  });
+
+  // Close emoji picker when clicking outside
+  document.addEventListener('click', (e) => {
+    const picker = document.getElementById('emoji-picker');
+    const btn = document.getElementById('emoji-btn');
+    if (picker && picker.style.display !== 'none' &&
+        !picker.contains(e.target) && !btn.contains(e.target) &&
+        !e.target.closest('#dm-pip-emoji-btn') && !e.target.closest('#thread-emoji-btn')) {
+      picker.style.display = 'none';
+      if (picker._havenOrigParent) {
+        picker._havenOrigParent.appendChild(picker);
+        picker._havenOrigParent = null;
+        ['position', 'top', 'left', 'bottom', 'right', 'z-index'].forEach(p => picker.style.removeProperty(p));
+      }
+    }
+  });
+
+  // Reply close button
+  document.getElementById('reply-close-btn').addEventListener('click', () => {
+    this._clearReply();
+  });
+
+  // Cancel whatever is currently uploading
+  document.getElementById('upload-cancel-btn')?.addEventListener('click', () => {
+    this._cancelUploads();
+  });
+
+  // Messages container — move-selection mode intercept (supports Shift+click range)
+  document.getElementById('messages').addEventListener('click', (e) => {
+    if (!this._moveSelectionActive) return;
+    // Don't intercept toolbar button clicks
+    if (e.target.closest('.msg-toolbar, .msg-dots-btn')) return;
+    const msgEl = e.target.closest('.message, .message-compact');
+    if (msgEl) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.shiftKey && this._lastMoveSelectedEl) {
+        // Shift+click: select all messages between last selected and this one
+        const container = document.getElementById('messages');
+        const allMsgs = Array.from(container.querySelectorAll('.message, .message-compact'));
+        const lastIdx = allMsgs.indexOf(this._lastMoveSelectedEl);
+        const curIdx = allMsgs.indexOf(msgEl);
+        if (lastIdx !== -1 && curIdx !== -1) {
+          const start = Math.min(lastIdx, curIdx);
+          const end = Math.max(lastIdx, curIdx);
+          for (let i = start; i <= end; i++) {
+            const id = parseInt(allMsgs[i].dataset.msgId);
+            if (id && !this._moveSelectedIds.has(id)) {
+              if (this._moveSelectedIds.size >= 200) break;
+              this._moveSelectedIds.add(id);
+              allMsgs[i].classList.add('move-selected');
+            }
+          }
+          this._updateMoveCount();
+        }
+      } else {
+        this._toggleMoveSelect(msgEl);
+        this._lastMoveSelectedEl = msgEl;
+      }
+    }
+  }, true); // capture phase so it fires before the toolbar action handler
+
+  // Messages container — delegate reaction and reply button clicks
+  document.getElementById('messages').addEventListener('click', async (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+
+    const action = target.dataset.action;
+    const msgEl = target.closest('.message, .message-compact');
+    if (!msgEl) return;
+
+    const msgId = parseInt(msgEl.dataset.msgId);
+    if (!msgId) return;
+
+    if (action === 'react') {
+      this._showReactionPicker(msgEl, msgId);
+    } else if (action === 'reply') {
+      this._setReply(msgEl, msgId);
+    } else if (action === 'thread') {
+      // Threads are not available in DMs.
+      const curCh = this.channels && this.channels.find(c => c.code === this.currentChannel);
+      if (curCh && curCh.is_dm) {
+        this._showToast?.('Threads are not available in DMs', 'info');
+        return;
+      }
+      this._openThread(msgId);
+    } else if (action === 'quote') {
+      this._quoteMessage(msgEl);
+    } else if (action === 'edit') {
+      this._startEditMessage(msgEl, msgId);
+    } else if (action === 'delete') {
+      if (await this._showConfirmModal(t('confirm.delete_message'), '', { danger: true, confirmLabel: t('msg_toolbar.delete') })) {
+        this.socket.emit('delete-message', { messageId: msgId, attachments: this._getMessageAttachments?.(msgId) });
+      }
+    } else if (action === 'pin') {
+      if (await this._showConfirmModal(t('confirm.pin_message'), '')) {
+        this.socket.emit('pin-message', { messageId: msgId });
+      }
+    } else if (action === 'unpin') {
+      this.socket.emit('unpin-message', { messageId: msgId });
+    } else if (action === 'archive') {
+      this.socket.emit('archive-message', { messageId: msgId });
+    } else if (action === 'unarchive') {
+      this.socket.emit('unarchive-message', { messageId: msgId });
+    } else if (action === 'copy-link') {
+      this._copyChannelLink(this.currentChannel, msgId);
+    }
+  });
+
+  // Reaction badge click (toggle own reaction)
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const badge = e.target.closest('.reaction-badge');
+    if (!badge) return;
+    this._hideReactionPopout();
+    const msgEl = badge.closest('.message, .message-compact');
+    if (!msgEl) return;
+    const msgId = parseInt(msgEl.dataset.msgId);
+    const emoji = badge.dataset.emoji;
+    const hasOwn = badge.classList.contains('own');
+    if (hasOwn) {
+      this.socket.emit('remove-reaction', { messageId: msgId, emoji });
+    } else {
+      this.socket.emit('add-reaction', { messageId: msgId, emoji });
+    }
+  });
+
+  // Thread panel reactions: open picker + toggle reaction on badges
+  const threadMessages = document.getElementById('thread-messages');
+  if (threadMessages) {
+    threadMessages.addEventListener('click', async (e) => {
+      const threadActionBtn = e.target.closest('[data-thread-action]');
+      if (threadActionBtn) {
+        const msgEl = threadActionBtn.closest('.thread-message');
+        if (!msgEl) return;
+        const msgId = parseInt(msgEl.dataset.msgId, 10);
+        if (!msgId) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const action = threadActionBtn.dataset.threadAction;
+        if (action === 'react') {
+          this._showReactionPicker(msgEl, msgId);
+        } else if (action === 'reply') {
+          this._setThreadReply(msgEl, msgId);
+        } else if (action === 'quote') {
+          this._quoteThreadMessage(msgEl);
+        } else if (action === 'edit') {
+          this._startEditMessage(msgEl, msgId);
+        } else if (action === 'delete') {
+          if (await this._showConfirmModal(t('confirm.delete_message'), '', { danger: true, confirmLabel: t('msg_toolbar.delete') })) {
+            this.socket.emit('delete-message', { messageId: msgId, attachments: this._getMessageAttachments?.(msgId) });
+          }
+        }
+        return;
+      }
+
+      const banner = e.target.closest('.reply-banner');
+      if (banner) {
+        const replyMsgId = parseInt(banner.dataset.replyMsgId || '', 10);
+        if (!replyMsgId) return;
+        const target = threadMessages.querySelector(`[data-msg-id="${replyMsgId}"]`);
+        if (target) {
+          target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          target.classList.add('thread-highlight');
+          setTimeout(() => target.classList.remove('thread-highlight'), 1200);
+        }
+        return;
+      }
+
+      const badge = e.target.closest('.reaction-badge');
+      if (!badge) return;
+      this._hideReactionPopout();
+      const msgEl = badge.closest('.thread-message');
+      if (!msgEl) return;
+      const msgId = parseInt(msgEl.dataset.msgId, 10);
+      const emoji = badge.dataset.emoji;
+      const hasOwn = badge.classList.contains('own');
+      if (!msgId || !emoji) return;
+      if (hasOwn) {
+        this.socket.emit('remove-reaction', { messageId: msgId, emoji });
+      } else {
+        this.socket.emit('add-reaction', { messageId: msgId, emoji });
+      }
+    });
+  }
+
+  // Keep toolbar overflow menus visible: flip below when top space is too small.
+  const updateToolbarOverflowDirection = (moreWrap) => {
+    if (!moreWrap) return;
+    const overflow = moreWrap.querySelector('.msg-toolbar-overflow, .thread-msg-overflow');
+    if (!overflow) return;
+
+    overflow.classList.remove('flip-below');
+
+    const container = moreWrap.closest('#messages, #thread-messages, #dm-pip-messages');
+    const containerRect = container
+      ? container.getBoundingClientRect()
+      : { top: 0, bottom: window.innerHeight };
+    const moreRect = moreWrap.getBoundingClientRect();
+    const menuHeight = Math.max(overflow.scrollHeight, 40) + 8;
+    const spaceAbove = moreRect.top - containerRect.top;
+    const spaceBelow = containerRect.bottom - moreRect.bottom;
+
+    // Open downward when opening upward would clip in the current visible viewport.
+    if (spaceAbove < menuHeight && spaceBelow > spaceAbove) {
+      overflow.classList.add('flip-below');
+    }
+  };
+
+  const bindOverflowDirection = (container) => {
+    if (!container) return;
+
+    container.addEventListener('mouseover', (e) => {
+      const moreWrap = e.target.closest('.msg-toolbar-more, .thread-msg-more');
+      if (!moreWrap) return;
+      updateToolbarOverflowDirection(moreWrap);
+    });
+
+    container.addEventListener('focusin', (e) => {
+      const moreWrap = e.target.closest('.msg-toolbar-more, .thread-msg-more');
+      if (!moreWrap) return;
+      updateToolbarOverflowDirection(moreWrap);
+    });
+  };
+
+  bindOverflowDirection(document.getElementById('messages'));
+  bindOverflowDirection(threadMessages);
+  bindOverflowDirection(document.getElementById('dm-pip-messages'));
+
+  // Reaction badge hover — show popout with user list
+  {
+    let _popoutTimer = null;
+    const msgs = document.getElementById('messages');
+    const threadMsgs = document.getElementById('thread-messages');
+    msgs.addEventListener('mouseover', (e) => {
+      const badge = e.target.closest('.reaction-badge');
+      if (!badge) return;
+      clearTimeout(_popoutTimer);
+      _popoutTimer = setTimeout(() => this._showReactionPopout(badge), 350);
+    });
+    if (threadMsgs) {
+      threadMsgs.addEventListener('mouseover', (e) => {
+        const badge = e.target.closest('.reaction-badge');
+        if (!badge) return;
+        clearTimeout(_popoutTimer);
+        _popoutTimer = setTimeout(() => this._showReactionPopout(badge), 350);
+      });
+      threadMsgs.addEventListener('mouseout', (e) => {
+        const badge = e.target.closest('.reaction-badge');
+        if (!badge && !e.target.closest('#reaction-popout')) {
+          clearTimeout(_popoutTimer);
+          setTimeout(() => {
+            if (!document.querySelector('#reaction-popout:hover')) this._hideReactionPopout();
+          }, 200);
+        }
+      });
+    }
+    msgs.addEventListener('mouseout', (e) => {
+      const badge = e.target.closest('.reaction-badge');
+      if (!badge && !e.target.closest('#reaction-popout')) {
+        clearTimeout(_popoutTimer);
+        setTimeout(() => {
+          if (!document.querySelector('#reaction-popout:hover')) this._hideReactionPopout();
+        }, 200);
+      }
+    });
+    document.addEventListener('mouseover', (e) => {
+      if (!e.target.closest('#reaction-popout') && !e.target.closest('.reaction-badge')) {
+        clearTimeout(_popoutTimer);
+        this._hideReactionPopout();
+      }
+    });
+    // DM PiP reaction badge popout
+    const dmPipMsgs = document.getElementById('dm-pip-messages');
+    if (dmPipMsgs) {
+      dmPipMsgs.addEventListener('mouseover', (e) => {
+        const badge = e.target.closest('.reaction-badge');
+        if (!badge) return;
+        clearTimeout(_popoutTimer);
+        _popoutTimer = setTimeout(() => this._showReactionPopout(badge), 350);
+      });
+      dmPipMsgs.addEventListener('mouseout', (e) => {
+        const badge = e.target.closest('.reaction-badge');
+        if (!badge && !e.target.closest('#reaction-popout')) {
+          clearTimeout(_popoutTimer);
+          setTimeout(() => {
+            if (!document.querySelector('#reaction-popout:hover')) this._hideReactionPopout();
+          }, 200);
+        }
+      });
+    }
+  }
+
+  // ── Poll vote click (delegated from messages container) ──
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const optBtn = e.target.closest('.poll-option');
+    if (!optBtn) return;
+    const msgId = parseInt(optBtn.dataset.msgId);
+    const optionIndex = parseInt(optBtn.dataset.option);
+    if (!msgId || isNaN(optionIndex)) return;
+    const hasVote = optBtn.classList.contains('poll-voted');
+    if (hasVote) {
+      this.socket.emit('unvote-poll', { messageId: msgId, optionIndex });
+    } else {
+      this.socket.emit('vote-poll', { messageId: msgId, optionIndex });
+    }
+  });
+
+  // ── Poll creation modal ──
+  document.getElementById('poll-btn').addEventListener('click', () => {
+    this._openPollModal();
+  });
+
+  // (#5280) Burn-after-read toggle (DM-only, default 30 s).
+  // Persistent toggle: once armed, every outgoing message in the
+  // current DM is burn-after-read until the user clicks the button
+  // again to disarm it (or switches channels). Default duration is
+  // 30 s; a long-press could later pop a duration picker.
+  const _burnBtn = document.getElementById('burn-btn');
+  if (_burnBtn) {
+    _burnBtn.addEventListener('click', () => {
+      this._burnArmed = !this._burnArmed;
+      _burnBtn.classList.toggle('active', !!this._burnArmed);
+      // Use literal English for title — t() returns raw key on miss so the
+      // previous `t() || 'fallback'` pattern never showed the fallback. (#5325)
+      _burnBtn.title = this._burnArmed
+        ? 'Burn-after-read ON — every message in this DM self-destructs 30s after viewing. Click to turn off.'
+        : 'Burn after read (DM only)';
+      // Surface a toast so users get visible confirmation. The button alone
+      // wasn't obvious enough that anything had happened. (#5325)
+      const toastKey = this._burnArmed ? 'toasts.burn_armed' : 'toasts.burn_disarmed';
+      const toastFallback = this._burnArmed
+        ? '🔥 Burn-after-read ON — every message in this DM will self-destruct 30s after viewing'
+        : 'Burn-after-read disabled';
+      const translated = t(toastKey);
+      const toastText = (translated && translated !== toastKey) ? translated : toastFallback;
+      this._showToast?.(toastText, 'info');
+    });
+  }
+  document.getElementById('poll-cancel-btn').addEventListener('click', () => {
+    document.getElementById('poll-modal').style.display = 'none';
+  });
+  document.getElementById('poll-create-btn').addEventListener('click', () => {
+    this._submitPoll();
+  });
+  document.getElementById('poll-add-option-btn').addEventListener('click', () => {
+    this._addPollOption();
+  });
+  document.getElementById('poll-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'poll-modal') e.target.style.display = 'none';
+  });
+
+  // Rename username
+  document.getElementById('rename-btn').addEventListener('click', () => {
+    document.getElementById('rename-modal').style.display = 'flex';
+    const input = document.getElementById('rename-input');
+    input.value = this.user.displayName || this.user.username;
+    input.focus();
+    input.select();
+    // Populate bio
+    const bioInput = document.getElementById('edit-profile-bio');
+    if (bioInput) bioInput.value = this.user.bio || '';
+    // Load personas list (#86, #5349)
+    this._loadPersonas?.();
+    this._updateAvatarPreview();
+    this._resetBorderEditState();
+    // Sync shape picker buttons
+    const picker = document.getElementById('avatar-shape-picker');
+    if (picker) {
+      const currentShape = this.user.avatarShape || localStorage.getItem('haven_avatar_shape') || 'circle';
+      picker.querySelectorAll('.avatar-shape-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.shape === currentShape);
+      });
+      this._pendingAvatarShape = currentShape;
+    }
+  });
+
+  // ── Profile popup: click on message author name or avatar ──
+  document.getElementById('messages').addEventListener('click', (e) => {
+    const author = e.target.closest('.message-author');
+    const avatar = e.target.closest('.message-avatar, .message-avatar-img');
+    if (!author && !avatar) return;
+    // Don't trigger if clicking toolbar buttons
+    if (e.target.closest('.msg-toolbar')) return;
+    const msgEl = e.target.closest('.message, .message-compact');
+    if (!msgEl) return;
+    const userId = parseInt(msgEl.dataset.userId);
+    if (!isNaN(userId)) {
+      clearTimeout(this._hoverProfileTimer);
+      clearTimeout(this._hoverCloseTimer);
+      clearTimeout(this._hoverAutoCloseTimer);
+      clearTimeout(this._hoverFadeTimeout);
+      // If a hover popup is already open, promote it to permanent (no re-fetch)
+      const existingPopup = document.getElementById('profile-popup');
+      if (existingPopup && this._isHoverPopup) {
+        this._promoteHoverPopup(existingPopup);
+        return;
+      }
+      this._isHoverPopup = false;
+      this._hoverTarget = null;
+      this._profilePopupAnchor = e.target;
+      this.socket.emit('get-user-profile', { userId });
+    }
+  });
+
+  // ── Profile popup: click on user item in sidebar ──
+  document.getElementById('online-users').addEventListener('click', (e) => {
+    // Don't trigger for action buttons (DM, kick, etc.)
+    if (e.target.closest('.user-action-btn') || e.target.closest('.user-admin-actions')) return;
+    const userItem = e.target.closest('.user-item');
+    if (!userItem) return;
+    const userId = parseInt(userItem.dataset.userId);
+    if (!isNaN(userId)) {
+      clearTimeout(this._hoverProfileTimer);
+      clearTimeout(this._hoverCloseTimer);
+      clearTimeout(this._hoverAutoCloseTimer);
+      clearTimeout(this._hoverFadeTimeout);
+      // If a hover popup is already open, promote it to permanent (no re-fetch)
+      const existingPopup = document.getElementById('profile-popup');
+      if (existingPopup && this._isHoverPopup) {
+        this._promoteHoverPopup(existingPopup);
+        return;
+      }
+      this._isHoverPopup = false;
+      this._hoverTarget = null;
+      this._profilePopupAnchor = userItem;
+      this.socket.emit('get-user-profile', { userId });
+    }
+  });
+
+  // Double-click a user in the right sidebar to open a DM
+  document.getElementById('online-users').addEventListener('dblclick', (e) => {
+    if (e.target.closest('.user-action-btn') || e.target.closest('.user-admin-actions')) return;
+    const userItem = e.target.closest('.user-item');
+    if (!userItem) return;
+    const userId = parseInt(userItem.dataset.userId);
+    if (isNaN(userId) || userId === this.user.id) return;
+    this.socket.emit('start-dm', { targetUserId: userId });
+  });
+
+  // ── Right-click user → Invite to channel ──
+  document.getElementById('online-users').addEventListener('contextmenu', (e) => {
+    const userItem = e.target.closest('.user-item');
+    if (!userItem) return;
+    const userId = parseInt(userItem.dataset.userId);
+    if (isNaN(userId) || userId === this.user.id) return;
+    e.preventDefault();
+    this._showUserContextMenu(e, userId);
+  });
+
+  // ── Profile popup: hover-over on usernames/avatars (translucent preview) ──
+  const setupHoverProfile = (container, getInfo) => {
+    container.addEventListener('mouseover', (e) => {
+      const trigger = getInfo(e);
+      if (!trigger) {
+        // Mouse moved to a non-trigger element — cancel any pending hover
+        clearTimeout(this._hoverProfileTimer);
+        this._hoverTarget = null;
+        // Close hover popup INSTANTLY
+        if (this._isHoverPopup) {
+          clearTimeout(this._hoverCloseTimer);
+          clearTimeout(this._hoverAutoCloseTimer);
+          clearTimeout(this._hoverFadeTimeout);
+          this._closeProfilePopup();
+        }
+        return;
+      }
+      if (trigger.el === this._hoverTarget) return;
+      // Switching to a different trigger — close old hover popup instantly
+      if (this._isHoverPopup) {
+        clearTimeout(this._hoverFadeTimeout);
+        this._closeProfilePopup();
+      }
+      clearTimeout(this._hoverProfileTimer);
+      clearTimeout(this._hoverCloseTimer);
+      clearTimeout(this._hoverAutoCloseTimer);
+      this._hoverTarget = trigger.el;
+
+      // Don't show hover popup if a click-based popup is already open
+      if (document.getElementById('profile-popup') && !this._isHoverPopup) return;
+
+      this._hoverProfileTimer = setTimeout(() => {
+        // Verify the mouse is still over this trigger element
+        if (this._hoverTarget !== trigger.el) return;
+        if (!isNaN(trigger.userId)) {
+          this._profilePopupAnchor = trigger.el;
+          this._isHoverPopup = true;
+          this.socket.emit('get-user-profile', { userId: trigger.userId });
+        }
+      }, 350);
+    });
+
+    container.addEventListener('mouseleave', () => {
+      clearTimeout(this._hoverProfileTimer);
+      clearTimeout(this._hoverAutoCloseTimer);
+      clearTimeout(this._hoverFadeTimeout);
+      this._hoverTarget = null;
+      // Close hover popup INSTANTLY on leaving the container
+      if (this._isHoverPopup) {
+        this._closeProfilePopup();
+      }
+    });
+  };
+
+  setupHoverProfile(document.getElementById('messages'), (e) => {
+    const author = e.target.closest('.message-author');
+    const avatar = e.target.closest('.message-avatar, .message-avatar-img');
+    if (!author && !avatar) return null;
+    if (e.target.closest('.msg-toolbar')) return null;
+    const msgEl = (author || avatar).closest('.message, .message-compact');
+    if (!msgEl) return null;
+    return { el: author || avatar, userId: parseInt(msgEl.dataset.userId) };
+  });
+
+  setupHoverProfile(document.getElementById('online-users'), (e) => {
+    if (e.target.closest('.user-action-btn') || e.target.closest('.user-admin-actions')) return null;
+    const userItem = e.target.closest('.user-item');
+    if (!userItem) return null;
+    return { el: userItem, userId: parseInt(userItem.dataset.userId) };
+  });
+
+  document.getElementById('cancel-rename-btn').addEventListener('click', () => {
+    document.getElementById('rename-modal').style.display = 'none';
+  });
+
+  document.getElementById('save-rename-btn').addEventListener('click', () => this._saveRename());
+
+  // Add persona button (#86, #5349)
+  const addPersonaBtn = document.getElementById('add-persona-btn');
+  if (addPersonaBtn) addPersonaBtn.addEventListener('click', () => this._showPersonaEditor?.(null));
+
+  document.getElementById('rename-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') this._saveRename();
+  });
+
+  document.getElementById('rename-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+
+  // ── Admin moderation bindings ───────────────────────
+  document.getElementById('cancel-admin-action-btn').addEventListener('click', () => {
+    document.getElementById('admin-action-modal').style.display = 'none';
+  });
+
+  document.getElementById('admin-action-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+
+  document.getElementById('confirm-admin-action-btn').addEventListener('click', async () => {
+    if (!this.adminActionTarget) return;
+    const { action, userId, username } = this.adminActionTarget;
+    const reason = document.getElementById('admin-action-reason').value.trim();
+    const duration = parseInt(document.getElementById('admin-action-duration').value) || 10;
+    const scrubMessages = document.getElementById('admin-scrub-checkbox').checked;
+    const scrubScope = document.getElementById('admin-scrub-scope').value;
+
+    if (action === 'kick') {
+      this.socket.emit('kick-user', { userId, reason, scrubMessages, scrubScope });
+    } else if (action === 'ban') {
+      const purgeCheckbox = document.getElementById('admin-purge-checkbox');
+      const purgeInput = document.getElementById('admin-purge-message');
+      const purgeMessages = !!(purgeCheckbox && purgeCheckbox.checked);
+      const purgeMessage = purgeInput ? purgeInput.value.trim() : '';
+      const banIpCheckbox = document.getElementById('admin-ban-ip-checkbox');
+      const banIp = !!(banIpCheckbox && banIpCheckbox.checked);
+      this.socket.emit('ban-user', { userId, reason, scrubMessages, purgeMessages, purgeMessage, banIp });
+    } else if (action === 'mute') {
+      this.socket.emit('mute-user', { userId, reason, duration });
+    } else if (action === 'delete-user') {
+      const ok = await this._showConfirmModal(t('confirm.delete_user', { username }), '', { danger: true });
+      if (!ok) return;
+      this.socket.emit('delete-user', { userId, reason, scrubMessages });
+    }
+
+    document.getElementById('admin-action-modal').style.display = 'none';
+    this.adminActionTarget = null;
+  });
+
+  // ── Settings popout modal ────────────────────────────
+  const openSettingsModal = () => {
+    this._snapshotAdminSettings();
+    document.getElementById('settings-modal').style.display = 'flex';
+    this._syncSettingsNav();
+    // Always open on User tab
+    this._switchSettingsTab('user');
+    // Sync language select with current locale
+    const langSelect = document.getElementById('language-select');
+    if (langSelect && window.i18n) {
+      langSelect.value = i18n.preference;
+      i18n.syncLocalePicker(langSelect);
+    }
+    // Show desktop-only sections when running inside MSG Arena Desktop
+    if (window.havenDesktop?.isDesktopApp) {
+      document.getElementById('desktop-shortcuts-nav')?.style.removeProperty('display');
+      document.getElementById('desktop-app-nav')?.style.removeProperty('display');
+      document.getElementById('section-desktop-shortcuts')?.style.removeProperty('display');
+      document.getElementById('section-desktop-app')?.style.removeProperty('display');
+      document.getElementById('pref-force-sdr-row')?.style.removeProperty('display');
+      document.getElementById('pref-disable-gpu-vsync-row')?.style.removeProperty('display');
+      document.getElementById('pref-unlimit-frame-rate-row')?.style.removeProperty('display');
+    }
+    // Eagerly fetch data that requires async calls so sections don't
+    // sit on "Loading..." indefinitely if the user never clicks the nav item.
+    loadTotpStatus();
+    if (this.user?.isAdmin) this._loadRoles();
+    // (#36) Eagerly wire up Desktop-only sections too. Without this the Shortcut
+    // record buttons and Desktop App / Debug prefs only get their event handlers
+    // attached when the user clicks the matching left-nav item, so a user who
+    // opens Settings and scrolls straight to a checkbox or to the keybind
+    // recorder finds them unresponsive until they happen to click the nav.
+    if (window.havenDesktop?.isDesktopApp) {
+      this._setupDesktopShortcuts?.();
+      this._setupDesktopAppPrefs?.();
+    }
+  };
+  document.getElementById('open-settings-btn').addEventListener('click', openSettingsModal);
+  document.getElementById('mobile-settings-btn')?.addEventListener('click', () => {
+    openSettingsModal();
+    document.getElementById('app-body')?.classList.remove('mobile-sidebar-open');
+    document.getElementById('mobile-overlay')?.classList.remove('active');
+  });
+  document.getElementById('close-settings-btn').addEventListener('click', () => {
+    this._cancelAdminSettings();
+  });
+  document.getElementById('settings-modal').addEventListener('click', (e) => {
+    if (e.target !== e.currentTarget) return;
+    // Don't close while TOTP setup flow is active — user could lose progress
+    const setupArea  = document.getElementById('totp-setup-area');
+    const backupArea = document.getElementById('totp-backup-area');
+    if ((setupArea  && setupArea.style.display  !== 'none') ||
+        (backupArea && backupArea.style.display !== 'none')) return;
+    this._cancelAdminSettings();
+  });
+  document.getElementById('admin-save-btn')?.addEventListener('click', () => {
+    this._saveAdminSettings();
+  });
+
+  // ── Settings tab switching (User / Admin) ────────────
+  this._switchSettingsTab = (tab) => {
+    const userBody = document.getElementById('settings-body-user');
+    const adminBody = document.getElementById('settings-body-admin');
+    const userNav = document.querySelector('.settings-nav-user');
+    const adminNav = document.querySelector('.settings-nav-admin-group');
+    const saveBar = document.querySelector('.admin-save-bar');
+
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.settings-tab[data-tab="${tab}"]`)?.classList.add('active');
+
+    if (tab === 'admin') {
+      // Defensive gate: refuse switching to the admin tab if the user has no
+      // admin/manage permissions, regardless of where the call came from.
+      const isAdmin = !!(this.user && this.user.isAdmin);
+      const hasAdminAccess = isAdmin
+        || this._hasPerm?.('manage_emojis')
+        || this._hasPerm?.('manage_stickers')
+        || this._hasPerm?.('manage_soundboard')
+        || this._hasPerm?.('manage_roles')
+        || this._hasPerm?.('manage_server')
+        || this._hasPerm?.('view_audit_log');
+      if (!hasAdminAccess) return this._switchSettingsTab('user');
+      if (userBody) userBody.style.display = 'none';
+      if (adminBody) adminBody.style.display = '';
+      if (userNav) userNav.style.display = 'none';
+      if (adminNav) adminNav.style.display = '';
+      if (saveBar) saveBar.style.display = '';
+      // Activate first admin nav item
+      document.querySelectorAll('.settings-nav-item').forEach(n => n.classList.remove('active'));
+      const firstAdmin = adminNav?.querySelector('.settings-nav-item:not([style*="display: none"])');
+      if (firstAdmin) firstAdmin.classList.add('active');
+    } else {
+      if (userBody) userBody.style.display = '';
+      if (adminBody) adminBody.style.display = 'none';
+      if (userNav) userNav.style.display = '';
+      if (adminNav) adminNav.style.display = 'none';
+      if (saveBar) saveBar.style.display = 'none';
+      // Activate first user nav item
+      document.querySelectorAll('.settings-nav-item').forEach(n => n.classList.remove('active'));
+      const firstUser = userNav?.querySelector('.settings-nav-item');
+      if (firstUser) firstUser.classList.add('active');
+    }
+  };
+
+  document.querySelectorAll('.settings-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      this._switchSettingsTab(tab.dataset.tab);
+    });
+  });
+
+  // ── Settings nav click-to-scroll ─────────────────────
+  document.querySelectorAll('.settings-nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const targetId = item.dataset.target;
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      // Scroll into view within the settings body
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Update active state
+      document.querySelectorAll('.settings-nav-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+      // Suppress scroll-spy briefly so the smooth-scroll animation passing over
+      // intermediate sections doesn't steal the highlight from what was clicked.
+      this._settingsSpyMuteUntil = Date.now() + 800;
+    });
+  });
+
+  // ── Settings scroll-spy ──────────────────────────────
+  // (language picker is built above; scroll-spy follows)
+  // The settings body is one long scrolling column, not a tab switcher, so the
+  // nav highlight used to sit on whatever was last clicked (or "Language" by
+  // default) no matter where you'd scrolled to. That made the nav actively
+  // misleading — it would claim you were in Language while you were looking at
+  // Activity. Track the topmost visible section instead.
+  const settingsBody = document.getElementById('settings-body-user');
+  if (settingsBody) {
+    const syncNavHighlight = () => {
+      if (Date.now() < (this._settingsSpyMuteUntil || 0)) return;
+      const navItems = Array.from(document.querySelectorAll('.settings-nav-user .settings-nav-item'));
+      if (!navItems.length) return;
+      const bodyTop = settingsBody.getBoundingClientRect().top;
+
+      let current = null;
+      for (const item of navItems) {
+        const section = document.getElementById(item.dataset.target);
+        if (!section || section.offsetParent === null) continue;
+        // The last section whose top has passed the viewport top is the one
+        // being read; anything below that hasn't been reached yet.
+        if (section.getBoundingClientRect().top - bodyTop <= 8) current = item;
+        else break;
+      }
+      if (!current) current = navItems[0];
+      if (current.classList.contains('active')) return;
+
+      navItems.forEach(n => n.classList.remove('active'));
+      current.classList.add('active');
+      // Keep the highlighted entry reachable in a long nav list.
+      current.scrollIntoView({ block: 'nearest' });
+    };
+
+    let spyQueued = false;
+    settingsBody.addEventListener('scroll', () => {
+      if (spyQueued) return;
+      spyQueued = true;
+      requestAnimationFrame(() => { spyQueued = false; syncNavHighlight(); });
+    }, { passive: true });
+  }
+
+  // ── Language switcher ────────────────────────────────
+  document.getElementById('language-select')?.addEventListener('change', (e) => {
+    if (window.i18n) i18n.setLocale(e.target.value);
+  });
+  this._buildLanguagePicker();
+
+  // ── Password change ──────────────────────────────────
+  document.getElementById('change-password-btn').addEventListener('click', async () => {
+    const cur  = document.getElementById('current-password').value;
+    const np   = document.getElementById('new-password').value;
+    const conf = document.getElementById('confirm-password').value;
+    const hint = document.getElementById('password-status');
+    hint.textContent = '';
+    hint.className = 'settings-hint';
+
+    if (!cur || !np) return hint.textContent = t('settings.password_section.fill_fields');
+    if (np.length < 8) return hint.textContent = t('settings.password_section.too_short');
+    if (np !== conf)   return hint.textContent = t('settings.password_section.mismatch');
+
+    // Flag to prevent force-logout from kicking us out
+    this._justChangedPassword = true;
+
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.token}`
+        },
+        body: JSON.stringify({ currentPassword: cur, newPassword: np })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        hint.textContent = data.error || t('settings.password_section.failed');
+        hint.classList.add('error');
+        return;
+      }
+      // Store the fresh token
+      this.token = data.token;
+      localStorage.setItem('haven_token', data.token);
+      // Update socket auth so auto-reconnect uses the new token
+      this.socket.auth.token = data.token;
+
+      // Re-wrap E2E private key with a key derived from the NEW password
+      // so the server backup can be unlocked with the new credentials
+      if (this.e2e && this.e2e.ready && typeof HavenE2E !== 'undefined') {
+        try {
+          const newWrap = await HavenE2E.deriveWrappingKey(np);
+          await this.e2e.reWrapKey(this.socket, newWrap);
+          // Re-encrypt server list blob with the new wrapping key
+          this._e2eWrappingKey = newWrap;
+          this._pushServerListToServer();
+        } catch (err) {
+          console.warn('[E2E] Failed to re-wrap key:', err);
+        }
+      }
+
+      hint.textContent = '✅ ' + t('settings.password_section.changed');
+      hint.classList.add('success');
+      document.getElementById('current-password').value = '';
+      document.getElementById('new-password').value = '';
+      document.getElementById('confirm-password').value = '';
+      // Clear the flag after a delay so socket reconnects go through
+      setTimeout(() => { this._justChangedPassword = false; }, 5000);
+    } catch {
+      this._justChangedPassword = false;
+      hint.textContent = t('settings.password_section.network_error');
+      hint.classList.add('error');
+    }
+  });
+
+  // ── Two-Factor Authentication settings ─────────────
+  const totpStatusText     = document.getElementById('totp-status-text');
+  const totpEnableArea     = document.getElementById('totp-enable-area');
+  const totpSetupArea      = document.getElementById('totp-setup-area');
+  const totpBackupArea     = document.getElementById('totp-backup-area');
+  const totpManageArea     = document.getElementById('totp-manage-area');
+  const totpSetupStatus    = document.getElementById('totp-setup-status');
+  const totpManageStatus   = document.getElementById('totp-manage-status');
+
+  const loadTotpStatus = async () => {
+    if (!totpStatusText) return;
+    try {
+      const res = await fetch('/api/auth/totp/status', {
+        headers: { 'Authorization': `Bearer ${this.token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) { totpStatusText.textContent = data.error || t('settings.two_factor_section.error'); return; }
+
+      // Hide all sub-areas first
+      totpEnableArea.style.display = 'none';
+      totpSetupArea.style.display = 'none';
+      totpBackupArea.style.display = 'none';
+      totpManageArea.style.display = 'none';
+
+      if (data.enabled) {
+        totpStatusText.textContent = '';
+        totpManageArea.style.display = 'block';
+        const remaining = document.getElementById('totp-backup-remaining');
+        if (remaining) remaining.textContent = data.backupCodesRemaining === 1
+          ? t('settings.two_factor_section.backup_codes_remaining_one', { count: data.backupCodesRemaining })
+          : t('settings.two_factor_section.backup_codes_remaining_other', { count: data.backupCodesRemaining });
+        // Clear password input
+        const pwInput = document.getElementById('totp-disable-password');
+        if (pwInput) pwInput.value = '';
+        if (totpManageStatus) { totpManageStatus.textContent = ''; totpManageStatus.className = 'settings-hint'; }
+      } else {
+        totpStatusText.textContent = '';
+        totpEnableArea.style.display = 'block';
+      }
+    } catch {
+      totpStatusText.textContent = t('settings.two_factor_section.connection_error');
+    }
+  };
+
+  // Load status when the 2FA section becomes visible
+  const settingsNav = document.getElementById('settings-nav');
+  if (settingsNav) {
+    settingsNav.addEventListener('click', (e) => {
+      const item = e.target.closest('.settings-nav-item');
+      if (item && item.dataset.target === 'section-2fa') loadTotpStatus();
+      if (item && item.dataset.target === 'section-sessions') this._refreshSessions();
+      if (item && item.dataset.target === 'section-desktop-shortcuts') this._setupDesktopShortcuts();
+      if (item && item.dataset.target === 'section-desktop-app') this._setupDesktopAppPrefs();
+    });
+  }
+
+  // Enable button → start setup
+  document.getElementById('totp-enable-btn')?.addEventListener('click', async () => {
+    totpEnableArea.style.display = 'none';
+    totpSetupArea.style.display = 'block';
+    if (totpSetupStatus) { totpSetupStatus.textContent = ''; totpSetupStatus.className = 'settings-hint'; }
+    document.getElementById('totp-verify-code').value = '';
+
+    try {
+      const res = await fetch('/api/auth/totp/setup', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) { totpSetupStatus.textContent = data.error || t('settings.two_factor_section.setup_failed'); return; }
+
+      document.getElementById('totp-qr-img').src = data.qrDataUrl;
+      document.getElementById('totp-secret-text').textContent = data.base32Secret;
+    } catch {
+      totpSetupStatus.textContent = t('settings.two_factor_section.connection_error');
+    }
+  });
+
+  // Copy secret button
+  document.getElementById('totp-copy-secret')?.addEventListener('click', () => {
+    const secret = document.getElementById('totp-secret-text')?.textContent;
+    if (!secret) return;
+    const copyBtn = document.getElementById('totp-copy-secret');
+    const markCopied = () => {
+      copyBtn.textContent = '✅ ' + t('common.copied');
+      setTimeout(() => { copyBtn.textContent = '📋 ' + t('common.copy'); }, 1500);
+    };
+    navigator.clipboard.writeText(secret).then(markCopied).catch(() => {
+      // Fallback for Electron / contexts where Clipboard API is restricted
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = secret;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        markCopied();
+      } catch { /* could not copy */ }
+    });
+  });
+
+  // Cancel setup
+  document.getElementById('totp-cancel-setup-btn')?.addEventListener('click', () => {
+    totpSetupArea.style.display = 'none';
+    totpEnableArea.style.display = 'block';
+  });
+
+  // Verify & Activate
+  document.getElementById('totp-verify-setup-btn')?.addEventListener('click', async () => {
+    const code = document.getElementById('totp-verify-code')?.value.trim();
+    if (!code || code.length !== 6) {
+      if (totpSetupStatus) totpSetupStatus.textContent = t('settings.two_factor_section.verify_prompt');
+      return;
+    }
+    try {
+      const res = await fetch('/api/auth/totp/verify-setup', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (totpSetupStatus) { totpSetupStatus.textContent = data.error || t('settings.two_factor_section.verify_failed'); totpSetupStatus.classList.add('error'); }
+        return;
+      }
+      // Store fresh token — server bumped password_version to invalidate other sessions
+      if (data.token) {
+        this._justEnabledTotp = true;
+        this.token = data.token;
+        localStorage.setItem('haven_token', data.token);
+        if (this.socket) this.socket.auth.token = data.token;
+      }
+      // Show backup codes
+      totpSetupArea.style.display = 'none';
+      totpBackupArea.style.display = 'block';
+      const codesEl = document.getElementById('totp-backup-codes');
+      if (codesEl) codesEl.innerHTML = data.backupCodes.map(c => `<div>${c}</div>`).join('');
+    } catch {
+      if (totpSetupStatus) totpSetupStatus.textContent = t('settings.two_factor_section.connection_error');
+    }
+  });
+
+  // Copy backup codes to clipboard
+  document.getElementById('totp-copy-backup-btn')?.addEventListener('click', () => {
+    const codesEl = document.getElementById('totp-backup-codes');
+    if (!codesEl) return;
+    const codes = Array.from(codesEl.querySelectorAll('div')).map(d => d.textContent).join('\n');
+    const btn = document.getElementById('totp-copy-backup-btn');
+    const markCopied = () => {
+      btn.textContent = '✅ ' + t('common.copied') + '!';
+      setTimeout(() => { btn.textContent = '📋 ' + t('settings.two_factor_section.copy_backup_btn'); }, 2000);
+    };
+    navigator.clipboard.writeText(codes).then(markCopied).catch(() => {
+      // Fallback for Electron / contexts where Clipboard API is restricted
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = codes;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        markCopied();
+      } catch { /* could not copy */ }
+    });
+  });
+
+  // Done viewing backup codes
+  document.getElementById('totp-backup-done-btn')?.addEventListener('click', () => {
+    loadTotpStatus();
+  });
+
+  // Disable 2FA
+  document.getElementById('totp-disable-btn')?.addEventListener('click', async () => {
+    const pw = document.getElementById('totp-disable-password')?.value;
+    if (!pw) { if (totpManageStatus) totpManageStatus.textContent = t('settings.two_factor_section.disable_prompt'); return; }
+    try {
+      const res = await fetch('/api/auth/totp/disable', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (totpManageStatus) { totpManageStatus.textContent = data.error || t('settings.two_factor_section.failed'); totpManageStatus.classList.add('error'); }
+        return;
+      }
+      this._showToast(t('toasts.2fa_disabled'), 'info');
+      loadTotpStatus();
+    } catch {
+      if (totpManageStatus) totpManageStatus.textContent = t('settings.two_factor_section.connection_error');
+    }
+  });
+
+  // Regenerate backup codes
+  document.getElementById('totp-regen-backup-btn')?.addEventListener('click', async () => {
+    const pw = document.getElementById('totp-disable-password')?.value;
+    if (!pw) { if (totpManageStatus) totpManageStatus.textContent = t('settings.two_factor_section.regen_prompt'); return; }
+    try {
+      const res = await fetch('/api/auth/totp/regenerate-backup', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (totpManageStatus) { totpManageStatus.textContent = data.error || t('settings.two_factor_section.failed'); totpManageStatus.classList.add('error'); }
+        return;
+      }
+      // Show the new backup codes
+      totpManageArea.style.display = 'none';
+      totpBackupArea.style.display = 'block';
+      const codesEl = document.getElementById('totp-backup-codes');
+      if (codesEl) codesEl.innerHTML = data.backupCodes.map(c => `<div>${c}</div>`).join('');
+    } catch {
+      if (totpManageStatus) totpManageStatus.textContent = t('settings.two_factor_section.connection_error');
+    }
+  });
+
+  // ── Recovery Codes section ───────────────────────────
+  const loadRecoveryStatus = async () => {
+    const statusEl = document.getElementById('recovery-code-status');
+    if (!statusEl) return;
+    try {
+      const res = await fetch('/api/auth/recovery-codes/status', {
+        headers: { 'Authorization': `Bearer ${this.token}` }
+      });
+      const data = await res.json();
+      if (!res.ok) { statusEl.textContent = data.error || t('settings.two_factor_section.error'); return; }
+      statusEl.textContent = data.count > 0
+        ? (data.count === 1
+            ? t('settings.recovery_section.status_one', { count: data.count })
+            : t('settings.recovery_section.status_other', { count: data.count }))
+        : t('settings.recovery_section.no_codes');
+    } catch {
+      statusEl.textContent = t('settings.recovery_section.connection_error');
+    }
+  };
+
+  // Load status when Recovery section becomes visible
+  if (settingsNav) {
+    const _origSettingsNavHandler = settingsNav._recoveryNavAdded;
+    if (!_origSettingsNavHandler) {
+      settingsNav._recoveryNavAdded = true;
+      settingsNav.addEventListener('click', (e) => {
+        const item = e.target.closest('.settings-nav-item');
+        if (item && item.dataset.target === 'section-recovery') {
+          loadRecoveryStatus();
+          document.getElementById('recovery-gen-status').textContent = '';
+          document.getElementById('recovery-gen-password').value = '';
+          document.getElementById('recovery-generate-area').style.display = '';
+          document.getElementById('recovery-codes-area').style.display = 'none';
+        }
+      });
+    }
+  }
+
+  document.getElementById('recovery-generate-btn')?.addEventListener('click', async () => {
+    const password = document.getElementById('recovery-gen-password')?.value;
+    const statusEl = document.getElementById('recovery-gen-status');
+    if (!password) { statusEl.textContent = t('settings.recovery_section.confirm_prompt'); return; }
+    statusEl.textContent = '';
+    try {
+      const res = await fetch('/api/auth/recovery-codes/generate', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      const data = await res.json();
+      if (!res.ok) { statusEl.textContent = data.error || t('settings.recovery_section.failed'); return; }
+
+      const codesEl = document.getElementById('recovery-codes-list');
+      if (codesEl) codesEl.innerHTML = data.codes.map(c => `<div>${c}</div>`).join('');
+      document.getElementById('recovery-generate-area').style.display = 'none';
+      document.getElementById('recovery-codes-area').style.display = '';
+      loadRecoveryStatus();
+    } catch {
+      statusEl.textContent = t('settings.recovery_section.connection_error');
+    }
+  });
+
+  document.getElementById('recovery-copy-btn')?.addEventListener('click', () => {
+    const codesEl = document.getElementById('recovery-codes-list');
+    if (!codesEl) return;
+    const text = Array.from(codesEl.querySelectorAll('div')).map(d => d.textContent).join('\n');
+    const btn = document.getElementById('recovery-copy-btn');
+    const markCopied = () => {
+      btn.textContent = '✅ ' + t('common.copied') + '!';
+      setTimeout(() => { btn.textContent = '📋 ' + t('settings.recovery_section.copy_codes_btn'); }, 2000);
+    };
+    navigator.clipboard.writeText(text).then(markCopied).catch(() => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+        document.body.appendChild(ta);
+        ta.focus(); ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        markCopied();
+      } catch { /* could not copy */ }
+    });
+  });
+
+  document.getElementById('recovery-codes-done-btn')?.addEventListener('click', () => {
+    document.getElementById('recovery-codes-area').style.display = 'none';
+    document.getElementById('recovery-generate-area').style.display = '';
+    document.getElementById('recovery-gen-password').value = '';
+  });
+
+  // ── Plugin refresh button ─────────────────────────────
+  document.getElementById('plugin-refresh-btn')?.addEventListener('click', () => {
+    if (window.HavenPluginLoader) {
+      window.HavenPluginLoader.refresh();
+      this._showToast(t('toasts.plugins_refreshing'), 'info');
+    }
+  });
+
+  // ── Self-delete account ─────────────────────────────
+  document.getElementById('delete-account-btn').addEventListener('click', () => {
+    // Build a confirmation overlay dynamically
+    const existing = document.querySelector('.self-delete-overlay');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay self-delete-overlay';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="modal" style="max-width:380px">
+        <h3>⚠️ ${t('settings.delete_account_section.title')}</h3>
+        <p class="modal-desc">${t('settings.delete_account_section.desc')}</p>
+        <div class="form-group compact">
+          <input type="password" id="self-delete-pw" placeholder="${t('settings.delete_account_section.password_placeholder')}" maxlength="128" autocomplete="current-password">
+        </div>
+        <label class="toggle-row" style="margin:8px 0">
+          <span>Delete all my messages</span>
+          <input type="checkbox" id="self-delete-scrub">
+        </label>
+        <small class="settings-hint" style="margin-bottom:8px;display:block">If unchecked, your messages will show as "[Deleted User]" instead.</small>
+        <small class="settings-hint self-delete-status" style="display:block;margin-bottom:8px"></small>
+        <div class="modal-actions">
+          <button class="btn-sm self-delete-cancel">${t('modals.common.cancel')}</button>
+          <button class="btn-sm btn-danger-fill self-delete-confirm">${t('settings.delete_account_section.btn')}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.self-delete-cancel').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    overlay.querySelector('.self-delete-confirm').addEventListener('click', async () => {
+      const pw = document.getElementById('self-delete-pw').value;
+      const scrub = document.getElementById('self-delete-scrub').checked;
+      const status = overlay.querySelector('.self-delete-status');
+
+      if (!pw) { status.textContent = t('settings.delete_account_section.password_required'); return; }
+      const ok = await this._showConfirmModal(t('confirm.delete_account'), '', { danger: true });
+      if (!ok) return;
+
+      status.textContent = t('settings.delete_account_section.deleting');
+      overlay.querySelector('.self-delete-confirm').disabled = true;
+
+      this.socket.emit('self-delete-account', { password: pw, scrubMessages: scrub }, (res) => {
+        if (res && res.error) {
+          status.textContent = res.error;
+          overlay.querySelector('.self-delete-confirm').disabled = false;
+          return;
+        }
+        // Account deleted — clear local storage and redirect to login
+        this._clearChannelCodeMap?.();
+        localStorage.removeItem('haven_token');
+        localStorage.removeItem('haven_e2e_privkey');
+        localStorage.removeItem('haven_sync_key');
+        window.location.reload();
+      });
+    });
+  });
+
+  // Member visibility select (admin) — saved via admin Save button
+
+  // View bans button
+  document.getElementById('view-bans-btn').addEventListener('click', () => {
+    this.socket.emit('get-bans');
+    document.getElementById('bans-modal').style.display = 'flex';
+  });
+
+  document.getElementById('close-bans-btn').addEventListener('click', () => {
+    document.getElementById('bans-modal').style.display = 'none';
+  });
+
+  document.getElementById('bans-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+
+  // ── Banned IPs modal (v3.20.0) ─────────────────────
+  const viewIpBansBtn = document.getElementById('view-ip-bans-btn');
+  if (viewIpBansBtn) {
+    viewIpBansBtn.addEventListener('click', () => {
+      this.socket.emit('get-ip-bans');
+      document.getElementById('ip-bans-modal').style.display = 'flex';
+    });
+  }
+  const closeIpBansBtn = document.getElementById('close-ip-bans-btn');
+  if (closeIpBansBtn) {
+    closeIpBansBtn.addEventListener('click', () => {
+      document.getElementById('ip-bans-modal').style.display = 'none';
+    });
+  }
+  const ipBansModal = document.getElementById('ip-bans-modal');
+  if (ipBansModal) {
+    ipBansModal.addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+    });
+  }
+  const ipBanAddBtn = document.getElementById('ip-ban-add-btn');
+  if (ipBanAddBtn) {
+    ipBanAddBtn.addEventListener('click', () => {
+      const ipEl = document.getElementById('ip-ban-input');
+      const reasonEl = document.getElementById('ip-ban-reason-input');
+      const ip = (ipEl && ipEl.value || '').trim();
+      const reason = (reasonEl && reasonEl.value || '').trim();
+      if (!ip) return;
+      this.socket.emit('ban-ip', { ip, reason });
+      if (ipEl) ipEl.value = '';
+      if (reasonEl) reasonEl.value = '';
+      // Server refreshes the list after unban; for direct ban, refresh manually.
+      setTimeout(() => this.socket.emit('get-ip-bans'), 150);
+    });
+  }
+
+  // View deleted users button
+  document.getElementById('view-deleted-users-btn').addEventListener('click', () => {
+    this.socket.emit('get-deleted-users');
+    document.getElementById('deleted-users-modal').style.display = 'flex';
+  });
+
+  document.getElementById('close-deleted-users-btn').addEventListener('click', () => {
+    document.getElementById('deleted-users-modal').style.display = 'none';
+  });
+
+  document.getElementById('deleted-users-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+
+  // View all members buttons (sidebar + admin settings)
+  document.getElementById('sidebar-members-btn').addEventListener('click', () => {
+    this._openAllMembersModal();
+  });
+  document.getElementById('view-all-members-btn').addEventListener('click', () => {
+    this._openAllMembersModal();
+  });
+  document.getElementById('close-all-members-btn').addEventListener('click', () => {
+    document.getElementById('all-members-modal').style.display = 'none';
+  });
+  document.getElementById('all-members-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  document.getElementById('all-members-search').addEventListener('input', () => this._filterAllMembers());
+  document.getElementById('all-members-filter').addEventListener('change', () => this._filterAllMembers());
+
+  // Members-list shortcuts to bans / deleted users (visibility gated by perms in
+  // _openAllMembersModal; server handlers re-check permissions on emit).
+  document.getElementById('aml-view-bans-btn')?.addEventListener('click', () => {
+    document.getElementById('all-members-modal').style.display = 'none';
+    this.socket.emit('get-bans');
+    document.getElementById('bans-modal').style.display = 'flex';
+  });
+  document.getElementById('aml-view-deleted-btn')?.addEventListener('click', () => {
+    document.getElementById('all-members-modal').style.display = 'none';
+    this.socket.emit('get-deleted-users');
+    document.getElementById('deleted-users-modal').style.display = 'flex';
+  });
+  document.getElementById('aml-bulk-cleanup-btn')?.addEventListener('click', () => {
+    if (this._openBulkCleanup) this._openBulkCleanup();
+  });
+
+  // ── Cleanup controls (admin) — saved via admin Save button ──
+  const cleanupAge = document.getElementById('cleanup-max-age');
+  if (cleanupAge) {
+    cleanupAge.addEventListener('change', () => {
+      const val = Math.max(0, Math.min(3650, parseInt(cleanupAge.value) || 0));
+      cleanupAge.value = val;
+    });
+  }
+  const cleanupSize = document.getElementById('cleanup-max-size');
+  if (cleanupSize) {
+    cleanupSize.addEventListener('change', () => {
+      const val = Math.max(0, Math.min(100000, parseInt(cleanupSize.value) || 0));
+      cleanupSize.value = val;
+    });
+  }
+
+  const runCleanupBtn = document.getElementById('run-cleanup-now-btn');
+  if (runCleanupBtn) {
+    runCleanupBtn.addEventListener('click', () => {
+      this.socket.emit('run-cleanup-now');
+      this._showToast(t('toasts.cleanup_triggered'), 'success');
+    });
+  }
+
+  // ── Server backup / restore (admin) ──────────────────
+  const startBackupDownload = async (include) => {
+    const token = localStorage.getItem('haven_token');
+    if (!token) return this._showToast(t('toasts.not_logged_in') || 'Not logged in', 'error');
+    // Fetch a short-lived, download-only token over the authenticated API so
+    // the full session JWT never lands in the URL (and thus in logs/history).
+    let dt;
+    try {
+      const r = await fetch('/api/admin/download-token', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      dt = (await r.json()).token;
+    } catch (e) {
+      return this._showToast(t('toasts.backup_restore_failed') || 'Could not start backup', 'error');
+    }
+    if (!dt) return this._showToast(t('toasts.backup_restore_failed') || 'Could not start backup', 'error');
+    const url = `/api/admin/backup?include=${encodeURIComponent(include)}&dt=${encodeURIComponent(dt)}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 1000);
+    this._showToast(t('toasts.backup_started') || 'Preparing backup…', 'info');
+  };
+  const getBackupIncludes = () => {
+    return Array.from(document.querySelectorAll('.backup-include:checked')).map(el => el.value);
+  };
+  document.getElementById('backup-download-btn')?.addEventListener('click', () => {
+    const includes = getBackupIncludes();
+    if (!includes.length) {
+      return this._showToast(t('toasts.backup_pick_one') || 'Pick at least one section to back up', 'error');
+    }
+    const heavy = includes.includes('messages') || includes.includes('files');
+    if (heavy && !confirm(t('confirm.backup_heavy') || 'This backup includes messages and/or uploaded files. It may take a while and produce a large download. Continue?')) return;
+    startBackupDownload(includes.join(','));
+  });
+  document.getElementById('backup-select-all-btn')?.addEventListener('click', () => {
+    document.querySelectorAll('.backup-include').forEach(el => { el.checked = true; });
+  });
+  document.getElementById('backup-select-none-btn')?.addEventListener('click', () => {
+    document.querySelectorAll('.backup-include').forEach(el => { el.checked = false; });
+  });
+
+  const restoreBtn = document.getElementById('backup-restore-btn');
+  if (restoreBtn) {
+    const progWrap  = document.getElementById('restore-progress');
+    const progFill  = document.getElementById('restore-progress-fill');
+    const progLabel = document.getElementById('restore-progress-label');
+    const fmtBytesR = (n) => {
+      if (n < 1024) return n + ' B';
+      if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+      if (n < 1073741824) return (n / 1048576).toFixed(1) + ' MB';
+      return (n / 1073741824).toFixed(2) + ' GB';
+    };
+    const setBar = (pct, indeterminate) => {
+      if (progWrap) progWrap.classList.toggle('indeterminate', !!indeterminate);
+      if (progFill) progFill.style.width = indeterminate ? '40%' : Math.max(0, Math.min(100, pct)) + '%';
+    };
+
+    restoreBtn.addEventListener('click', async () => {
+      const fileInput = document.getElementById('backup-restore-file');
+      const file = fileInput?.files?.[0];
+      if (!file) return this._showToast(t('toasts.backup_no_file') || 'Choose a backup .zip file first', 'error');
+      if (!confirm(t('confirm.backup_restore') || 'Restore this backup? It will OVERWRITE the current server data and restart the server. This cannot be undone (except via the haven.db.pre-restore copy on the host machine).')) return;
+      const token = localStorage.getItem('haven_token');
+      if (!token) return this._showToast(t('toasts.not_logged_in') || 'Not logged in', 'error');
+
+      restoreBtn.disabled = true;
+      const origText = restoreBtn.innerHTML;
+
+      // The server streams the uploaded zip to disk after the upload lands and
+      // emits `restore-progress` over the socket so we can show a real
+      // extraction bar instead of an opaque wait on large backups (#5438).
+      const onExtractProgress = (p) => {
+        if (!p || p.phase !== 'extract') return;
+        if (p.bytesTotal) {
+          const pct = Math.round((p.bytesDone / p.bytesTotal) * 100);
+          setBar(pct, false);
+          if (progLabel) progLabel.textContent = `Extracting on server… ${pct}% (${fmtBytesR(p.bytesDone)} / ${fmtBytesR(p.bytesTotal)})`;
+        } else {
+          setBar(0, true);
+          if (progLabel) progLabel.textContent = 'Extracting on server…';
+        }
+      };
+      this.socket?.on('restore-progress', onExtractProgress);
+      const cleanup = () => { try { this.socket?.off('restore-progress', onExtractProgress); } catch {} };
+
+      if (progWrap) progWrap.style.display = 'block';
+      setBar(0, false);
+      if (progLabel) progLabel.textContent = 'Uploading… 0%';
+      restoreBtn.innerHTML = '⏳ Uploading…';
+
+      try {
+        const data = await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', '/api/admin/restore');
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          xhr.timeout = 0; // multi-GB uploads can run for many minutes
+          xhr.upload.onprogress = (e) => {
+            if (!e.lengthComputable) return;
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setBar(pct, false);
+            if (progLabel) progLabel.textContent = `Uploading… ${pct}% (${fmtBytesR(e.loaded)} / ${fmtBytesR(e.total)})`;
+          };
+          xhr.upload.onload = () => {
+            // Upload finished — server now stages the zip to disk. Flip to the
+            // extraction phase; socket events refine this if/when they arrive.
+            setBar(0, true);
+            if (progLabel) progLabel.textContent = 'Upload complete — extracting on server…';
+            restoreBtn.innerHTML = '⏳ Extracting…';
+          };
+          xhr.onload = () => {
+            let d = {};
+            try { d = JSON.parse(xhr.responseText); } catch {}
+            if (xhr.status >= 200 && xhr.status < 300) resolve(d);
+            else reject(new Error(d.error || `HTTP ${xhr.status}`));
+          };
+          xhr.onerror = () => reject(new Error('Network error during upload'));
+          xhr.ontimeout = () => reject(new Error('Upload timed out'));
+          const fd = new FormData();
+          fd.append('backup', file);
+          xhr.send(fd);
+        });
+        cleanup();
+        setBar(100, false);
+        if (progLabel) progLabel.textContent = 'Done — server is restarting…';
+        this._showToast(data.message || 'Restore staged. Server restarting…', 'success');
+        restoreBtn.innerHTML = '✓ Restarting…';
+      } catch (err) {
+        cleanup();
+        if (progWrap) progWrap.style.display = 'none';
+        this._showToast((t('toasts.backup_restore_failed') || 'Restore failed: ') + err.message, 'error');
+        restoreBtn.disabled = false;
+        restoreBtn.innerHTML = origText;
+      }
+    });
+  }
+
+  // ── Auto-backup admin controls ─────────────────────
+  const fmtBytes = (n) => {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+    return (n / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  };
+  this._refreshAutoBackupList = async () => {
+    const listEl = document.getElementById('auto-backup-list');
+    if (!listEl) return;
+    const token = localStorage.getItem('haven_token');
+    if (!token) return;
+    try {
+      const res = await fetch('/api/admin/auto-backups', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const files = data.files || [];
+      if (!files.length) {
+        listEl.innerHTML = '<small class="settings-hint">No auto-backups yet.</small>';
+        return;
+      }
+      listEl.innerHTML = files.map(f => {
+        const safeName = f.name.replace(/[<>"&]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;', '&': '&amp;' }[c]));
+        const when = new Date(f.mtime).toLocaleString();
+        return `<div style="display:flex;gap:6px;align-items:center;justify-content:space-between;border:1px solid var(--border);padding:6px 8px;border-radius:4px">
+          <div style="min-width:0;flex:1">
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;font-size:0.85em">${safeName}</div>
+            <small class="settings-hint">${when} · ${fmtBytes(f.size)}</small>
+          </div>
+          <div style="display:flex;gap:4px;flex-shrink:0">
+            <button class="btn-sm auto-backup-dl-btn" data-name="${safeName}">⬇️</button>
+            <button class="btn-sm auto-backup-del-btn" data-name="${safeName}" title="Delete">🗑️</button>
+          </div>
+        </div>`;
+      }).join('');
+      listEl.querySelectorAll('.auto-backup-dl-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const name = btn.dataset.name;
+          const url = `/api/admin/auto-backups/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}`;
+          const a = document.createElement('a');
+          a.href = url; a.download = name; a.style.display = 'none';
+          document.body.appendChild(a); a.click(); setTimeout(() => a.remove(), 1000);
+        });
+      });
+      listEl.querySelectorAll('.auto-backup-del-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const name = btn.dataset.name;
+          if (!confirm(`Delete ${name}?`)) return;
+          const r = await fetch(`/api/admin/auto-backups/${encodeURIComponent(name)}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (r.ok) this._refreshAutoBackupList();
+          else this._showToast('Delete failed', 'error');
+        });
+      });
+    } catch (err) {
+      listEl.innerHTML = `<small class="settings-hint" style="color:var(--danger)">Failed to load: ${err.message}</small>`;
+    }
+  };
+  document.getElementById('auto-backup-save-btn')?.addEventListener('click', () => {
+    const enabled = document.getElementById('auto-backup-enabled')?.checked ? 'true' : 'false';
+    const interval = document.getElementById('auto-backup-interval')?.value || '24';
+    const retention = document.getElementById('auto-backup-retention')?.value || '7';
+    const sections = Array.from(document.querySelectorAll('.auto-backup-include:checked')).map(el => el.value);
+    if (enabled === 'true' && !sections.length) {
+      return this._showToast('Pick at least one section to back up', 'error');
+    }
+    this.socket.emit('update-server-setting', { key: 'auto_backup_enabled', value: enabled });
+    this.socket.emit('update-server-setting', { key: 'auto_backup_interval_hours', value: String(interval) });
+    this.socket.emit('update-server-setting', { key: 'auto_backup_retention', value: String(retention) });
+    this.socket.emit('update-server-setting', { key: 'auto_backup_sections', value: sections.join(',') });
+    this._showToast('Auto-backup schedule saved', 'success');
+  });
+  document.getElementById('auto-backup-run-now-btn')?.addEventListener('click', async () => {
+    const token = localStorage.getItem('haven_token');
+    if (!token) return;
+    try {
+      const r = await fetch('/api/admin/auto-backups/run-now', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      this._showToast('Auto-backup triggered. Refreshing list shortly…', 'info');
+      setTimeout(() => this._refreshAutoBackupList(), 3000);
+    } catch (err) {
+      this._showToast('Run failed: ' + err.message, 'error');
+    }
+  });
+  document.getElementById('auto-backup-refresh-btn')?.addEventListener('click', () => this._refreshAutoBackupList());
+
+  // ── In-app update controls ─────────────────────────
+  let lastUpdateCheck = null;
+  const updStatusEl = () => document.getElementById('update-status');
+  const updRunBtn = () => document.getElementById('update-run-btn');
+  document.getElementById('update-check-btn')?.addEventListener('click', async () => {
+    const token = localStorage.getItem('haven_token');
+    if (!token) return;
+    const status = updStatusEl();
+    if (status) { status.style.display = 'block'; status.textContent = 'Checking…'; }
+    try {
+      const r = await fetch('/api/admin/update/check', { headers: { 'Authorization': `Bearer ${token}` } });
+      const data = await r.json();
+      lastUpdateCheck = data;
+      if (status) {
+        const upToDate = !data.updateAvailable;
+        const esc = s => String(s || '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+        const cmdBlock = (!data.runnable && data.command) ? `
+          <div style="margin-top:8px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><strong>Run on host:</strong>
+              <button type="button" class="btn-sm" id="update-copy-cmd-btn" title="Copy command">📋 Copy</button>
+            </div>
+            <pre style="background:var(--bg-input);border:1px solid var(--border);border-radius:4px;padding:6px 8px;margin:0;white-space:pre-wrap;word-break:break-all"><code>${esc(data.command)}</code></pre>
+          </div>` : '';
+        status.innerHTML = `
+          <div><strong>Installed:</strong> v${esc(data.currentVersion)}</div>
+          <div><strong>Latest:</strong> ${data.latestVersion ? 'v' + esc(data.latestVersion) : 'unknown'}</div>
+          <div><strong>Install method:</strong> ${esc(data.method)}</div>
+          <div style="margin-top:6px">${data.notConfigured ? '⚙️ Update checks are off (set UPDATE_REPO in .env).' : (upToDate ? '✅ You are up to date.' : '⚠️ Update available.')}</div>
+          <div style="margin-top:6px"><small>${esc(data.message || '')}</small></div>
+          ${cmdBlock}
+          ${data.releaseUrl ? `<div style="margin-top:6px"><a href="${esc(data.releaseUrl)}" target="_blank" rel="noopener">Release notes →</a></div>` : ''}
+        `;
+        const copyBtn = document.getElementById('update-copy-cmd-btn');
+        if (copyBtn) copyBtn.addEventListener('click', () => {
+          try {
+            navigator.clipboard.writeText(data.command).then(() => {
+              copyBtn.textContent = '✅ Copied';
+              setTimeout(() => { copyBtn.textContent = '📋 Copy'; }, 1500);
+            });
+          } catch {}
+        });
+      }
+      // Keep the Update Now button enabled even when the install method
+      // isn't auto-runnable (Docker, manual). Click handler will surface
+      // the right manual command instead of failing silently. (#5267)
+      if (updRunBtn()) updRunBtn().disabled = !data.updateAvailable;
+    } catch (err) {
+      if (status) status.textContent = 'Check failed: ' + err.message;
+    }
+  });
+  document.getElementById('update-run-btn')?.addEventListener('click', async () => {
+    const status = updStatusEl();
+    // If the user clicks Run before clicking Check, do the check first so
+    // we always have a fresh `lastUpdateCheck` to act on. (#5267)
+    if (!lastUpdateCheck) {
+      try { document.getElementById('update-check-btn')?.click(); } catch {}
+      if (status) {
+        if (status.style) status.style.display = 'block';
+        status.textContent = 'Checking for updates first… click Update Now again once the check finishes.';
+      }
+      return;
+    }
+    if (!lastUpdateCheck.updateAvailable) {
+      if (status) {
+        if (status.style) status.style.display = 'block';
+        status.textContent = 'Already up to date — nothing to install.';
+      }
+      return;
+    }
+    if (!lastUpdateCheck.runnable) {
+      // Most common case: Docker install. Re-run check to surface the
+      // copyable command block instead of silently doing nothing.
+      try { document.getElementById('update-check-btn')?.click(); } catch {}
+      this._showToast?.(lastUpdateCheck.message || `In-app updates aren't supported for the "${lastUpdateCheck.method}" install method — run the command shown in the panel from your host.`, 'info');
+      return;
+    }
+    if (!confirm(`Apply update to v${lastUpdateCheck.latestVersion}? The server will run an auto-backup, then exit so the supervisor restarts it on the new code. You will be disconnected for ~30 seconds.`)) return;
+    const token = localStorage.getItem('haven_token');
+    if (!token) return;
+    // Visible status before the fetch so admins always see *something*
+    // happen on click — helps diagnose cases where the request fails
+    // silently or the host blocks the request. (#5267)
+    if (status) {
+      if (status.style) status.style.display = 'block';
+      status.textContent = 'Sending update request…';
+    }
+    try {
+      const r = await fetch('/api/admin/update/run', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      if (status) status.innerHTML = `<div>🔄 Update started. The server will restart shortly.</div><div style="margin-top:6px"><small>${data.message || ''}</small></div>`;
+      if (updRunBtn()) updRunBtn().disabled = true;
+    } catch (err) {
+      if (status) status.textContent = 'Update failed: ' + err.message;
+    }
+  });
+
+  // ── Whitelist controls (admin) ───────────────────────
+  // Whitelist toggle — saved via admin Save button
+
+  document.getElementById('whitelist-add-btn').addEventListener('click', () => {
+    const input = document.getElementById('whitelist-username-input');
+    const username = input.value.trim();
+    if (!username) return;
+    this.socket.emit('whitelist-add', { username });
+    input.value = '';
+  });
+
+  document.getElementById('whitelist-username-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('whitelist-add-btn').click();
+  });
+
+  // Listen for whitelist list updates
+  this.socket.on('whitelist-list', (list) => {
+    this._renderWhitelist(list);
+  });
+
+  // ── Auto-Mod panel (v3.42.0) ─────────────────────────────
+  // Wired here alongside the other admin-settings controls. Its settings
+  // apply immediately rather than through the Save flow, matching how the
+  // whitelist and tunnel controls already behave.
+  if (typeof this._initAutomodPanel === 'function') {
+    this._initAutomodPanel();
+    this.socket.emit('get-automod-domains');
+    this.socket.emit('get-automod-log', { limit: 100 });
+  }
+
+  // ── Tunnel settings (immediate — not part of Save flow) ──
+  const tunnelToggleBtn = document.getElementById('tunnel-toggle-btn');
+  if (tunnelToggleBtn) {
+    tunnelToggleBtn.addEventListener('click', () => {
+      // Determine desired state from button text
+      const wantStart = tunnelToggleBtn.textContent.trim().startsWith('Start');
+      this.socket.emit('update-server-setting', {
+        key: 'tunnel_enabled',
+        value: wantStart ? 'true' : 'false'
+      });
+      this._syncTunnelState(wantStart);
+    });
+  }
+
+  const tunnelProvEl = document.getElementById('tunnel-provider-select');
+  if (tunnelProvEl) {
+    tunnelProvEl.addEventListener('change', () => {
+      this.socket.emit('update-server-setting', {
+        key: 'tunnel_provider',
+        value: tunnelProvEl.value
+      });
+    });
+  }
+
+  // ── Server invite code (immediate — not part of Save flow) ──
+  document.getElementById('generate-server-code-btn')?.addEventListener('click', () => {
+    this.socket.emit('generate-server-code');
+  });
+  document.getElementById('clear-server-code-btn')?.addEventListener('click', () => {
+    if (!confirm(t('confirm.clear_invite_code'))) return;
+    this.socket.emit('clear-server-code');
+  });
+  document.getElementById('copy-server-code-btn')?.addEventListener('click', () => {
+    const code = document.getElementById('server-code-value')?.textContent;
+    if (code && code !== '—') {
+      const onCopied = () => this._showToast(t('toasts.server_code_copied'), 'success');
+      navigator.clipboard.writeText(code).then(onCopied).catch(() => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = code;
+          ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          onCopied();
+        } catch { /* could not copy */ }
+      });
+    }
+  });
+
+  // ── Registration token (#5344) — independent of whitelist ──
+  document.getElementById('registration-token-enabled')?.addEventListener('change', (e) => {
+    this.socket.emit('update-server-setting', {
+      key: 'registration_token_enabled',
+      value: e.target.checked ? 'true' : 'false'
+    });
+  });
+  document.getElementById('invites-bypass-registration-token')?.addEventListener('change', (e) => {
+    this.socket.emit('update-server-setting', {
+      key: 'invites_bypass_registration_token',
+      value: e.target.checked ? 'true' : 'false'
+    });
+  });
+  document.getElementById('generate-registration-token-btn')?.addEventListener('click', () => {
+    this.socket.emit('generate-registration-token');
+  });
+  document.getElementById('clear-registration-token-btn')?.addEventListener('click', () => {
+    if (!confirm('Clear the registration token? People will no longer be able to register with it.')) return;
+    this.socket.emit('clear-registration-token');
+  });
+  document.getElementById('copy-registration-token-btn')?.addEventListener('click', () => {
+    const tok = document.getElementById('registration-token-value')?.textContent;
+    if (tok && tok !== '—') {
+      const onCopied = () => this._showToast?.('Token copied', 'success');
+      (navigator.clipboard?.writeText
+        ? navigator.clipboard.writeText(tok).then(onCopied).catch(() => onCopied())
+        : onCopied());
+    }
+  });
+
+  // ── Default join channels (#5345) ──────────────────
+  const _renderDefaultJoinChannels = () => {
+    const host = document.getElementById('default-join-channels-list');
+    if (!host) return;
+    const all = (this.channels || []).filter(c =>
+      !c.is_dm && !c.parent_channel_id &&
+      !c.is_private && c.code_visibility !== 'private'
+    );
+    if (all.length === 0) {
+      host.innerHTML = '<p class="muted-text" style="margin:4px 0;font-size:0.85rem">No public channels yet.</p>';
+      return;
+    }
+    let selected = null; // null = "all"
+    try {
+      const raw = this.serverSettings?.default_join_channels;
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) selected = new Set(parsed.map(n => parseInt(n)));
+      }
+    } catch { /* fall back to all */ }
+    host.innerHTML = all.map(ch => {
+      const checked = (selected === null) || selected.has(ch.id);
+      return `<label style="display:flex;align-items:center;gap:6px;padding:3px 4px;font-size:0.85rem">
+        <input type="checkbox" class="default-join-channel-cb" data-cid="${ch.id}" ${checked ? 'checked' : ''}>
+        <span>#${this._escapeHtml(ch.name || '')}</span>
+      </label>`;
+    }).join('');
+  };
+  this._renderDefaultJoinChannels = _renderDefaultJoinChannels;
+  document.getElementById('default-join-channels-all-btn')?.addEventListener('click', () => {
+    document.querySelectorAll('.default-join-channel-cb').forEach(cb => { cb.checked = true; });
+  });
+  document.getElementById('default-join-channels-none-btn')?.addEventListener('click', () => {
+    document.querySelectorAll('.default-join-channel-cb').forEach(cb => { cb.checked = false; });
+  });
+  document.getElementById('default-join-channels-save-btn')?.addEventListener('click', () => {
+    const cbs = Array.from(document.querySelectorAll('.default-join-channel-cb'));
+    const total = cbs.length;
+    const picked = cbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.cid)).filter(Number.isFinite);
+    // "All checked" → store empty string so the default ("all public") logic kicks in
+    const value = (picked.length === total) ? '' : JSON.stringify(picked);
+    this.socket.emit('update-server-setting', { key: 'default_join_channels', value });
+    this._showToast?.(picked.length === total
+      ? 'Invite joiners will land in every public channel'
+      : `Invite joiners will land in ${picked.length} channel${picked.length === 1 ? '' : 's'}`,
+      'success');
+  });
+
+  // ── Guest channel whitelist (#5381) ────────────────
+  const _renderGuestChannels = () => {
+    const host = document.getElementById('guest-channels-list');
+    if (!host) return;
+    const chans = (this.channels || []).filter(c => !c.is_dm);
+    if (chans.length === 0) {
+      host.innerHTML = '<p class="muted-text" style="margin:4px 0;font-size:0.85rem">No channels yet.</p>';
+      return;
+    }
+    // CSV of channel ids. Empty string = no channels (guests can log in but have nowhere to go).
+    // (#5401) Sub-channels and voice rooms are listed individually so admins
+    // grant guests exactly the channels they intend — no implicit cascade.
+    const raw = this.serverSettings?.guest_channels || '';
+    const selected = new Set(
+      raw.split(',').map(s => s.trim()).filter(Boolean).map(s => parseInt(s)).filter(Number.isFinite)
+    );
+
+    const parents = chans.filter(c => !c.parent_channel_id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || String(a.name || '').localeCompare(String(b.name || '')));
+    const subsByParent = new Map();
+    chans.filter(c => c.parent_channel_id).forEach(c => {
+      if (!subsByParent.has(c.parent_channel_id)) subsByParent.set(c.parent_channel_id, []);
+      subsByParent.get(c.parent_channel_id).push(c);
+    });
+    for (const list of subsByParent.values()) {
+      list.sort((a, b) => (a.position ?? 0) - (b.position ?? 0) || String(a.name || '').localeCompare(String(b.name || '')));
+    }
+
+    const tagsFor = (ch) => {
+      const tags = [];
+      if (ch.is_private || ch.code_visibility === 'private') tags.push('private');
+      if (ch.text_enabled === 0 && ch.voice_enabled) tags.push('voice');
+      return tags.length
+        ? ` <small style="color:var(--text-muted)">(${tags.join(', ')})</small>` : '';
+    };
+    const row = (ch, isSub) => {
+      const checked = selected.has(ch.id);
+      const prefix = isSub ? '↳ ' : '#';
+      const parentAttr = isSub ? ` data-parent="${ch.parent_channel_id}"` : '';
+      return `<label style="display:flex;align-items:center;gap:6px;padding:3px 4px;font-size:0.85rem${isSub ? ';margin-left:18px' : ''}">
+        <input type="checkbox" class="guest-channel-cb" data-cid="${ch.id}"${parentAttr} ${checked ? 'checked' : ''}>
+        <span>${prefix}${this._escapeHtml(ch.name || '')}${tagsFor(ch)}</span>
+      </label>`;
+    };
+
+    let html = '';
+    for (const p of parents) {
+      html += row(p, false);
+      for (const sub of (subsByParent.get(p.id) || [])) html += row(sub, true);
+    }
+    host.innerHTML = html;
+    const toggle = document.getElementById('guests-enabled');
+    if (toggle) toggle.checked = (this.serverSettings?.guests_enabled === 'true');
+  };
+  this._renderGuestChannels = _renderGuestChannels;
+  document.getElementById('guests-enabled')?.addEventListener('change', (e) => {
+    this.socket.emit('update-server-setting', { key: 'guests_enabled', value: e.target.checked ? 'true' : 'false' });
+    this._showToast?.(e.target.checked ? 'Guest login enabled' : 'Guest login disabled', 'success');
+  });
+  document.getElementById('guest-channels-all-btn')?.addEventListener('click', () => {
+    document.querySelectorAll('.guest-channel-cb').forEach(cb => { cb.checked = true; });
+  });
+  document.getElementById('guest-channels-none-btn')?.addEventListener('click', () => {
+    document.querySelectorAll('.guest-channel-cb').forEach(cb => { cb.checked = false; });
+  });
+  // A sub-channel only appears in the sidebar nested under its parent, so a
+  // guest needs the parent too. Keep the checkboxes consistent: ticking a sub
+  // ticks its parent; unticking a parent unticks its sub-channels. (#5401)
+  document.getElementById('guest-channels-list')?.addEventListener('change', (e) => {
+    const cb = e.target.closest?.('.guest-channel-cb');
+    if (!cb) return;
+    if (cb.checked && cb.dataset.parent) {
+      const parent = document.querySelector(`.guest-channel-cb[data-cid="${cb.dataset.parent}"]`);
+      if (parent) parent.checked = true;
+    }
+    if (!cb.checked && !cb.dataset.parent) {
+      document.querySelectorAll(`.guest-channel-cb[data-parent="${cb.dataset.cid}"]`)
+        .forEach(sub => { sub.checked = false; });
+    }
+  });
+  document.getElementById('guest-channels-save-btn')?.addEventListener('click', () => {
+    const cbs = Array.from(document.querySelectorAll('.guest-channel-cb'));
+    const picked = cbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.cid)).filter(Number.isFinite);
+    const value = picked.join(',');
+    this.socket.emit('update-server-setting', { key: 'guest_channels', value });
+    this._showToast?.(picked.length === 0
+      ? 'Guests now have access to zero channels'
+      : `Guests can now access ${picked.length} channel${picked.length === 1 ? '' : 's'}`,
+      'success');
+  });
+
+  // ── Managed invite links (multi-code menu) ─────────
+  const _invitePublicChannels = () => (this.channels || []).filter(c =>
+    !c.is_dm && !c.parent_channel_id && !c.is_private && c.code_visibility !== 'private');
+
+  // Build a list of public-channel checkboxes. selectedSet === null → all checked
+  // ("grant all public"); otherwise only the ids in the set are checked.
+  const _inviteChannelChecks = (cls, selectedSet) => {
+    const all = _invitePublicChannels();
+    if (!all.length) return '<p class="muted-text" style="margin:4px 0;font-size:0.85rem">No public channels yet.</p>';
+    return all.map(ch => {
+      const checked = (selectedSet === null) || selectedSet.has(ch.id);
+      return `<label style="display:flex;align-items:center;gap:6px;padding:3px 4px;font-size:0.85rem">
+        <input type="checkbox" class="${cls}" data-cid="${ch.id}" ${checked ? 'checked' : ''}>
+        <span>#${this._escapeHtml(ch.name || '')}</span></label>`;
+    }).join('');
+  };
+
+  const _renderInviteCreateChannels = (force) => {
+    const host = document.getElementById('invite-new-channels');
+    if (!host) return;
+    // Don't clobber an in-progress selection on routine settings refreshes.
+    if (!force && host.querySelector('.invite-new-channel-cb')) return;
+    host.innerHTML = _inviteChannelChecks('invite-new-channel-cb', null);
+  };
+  this._renderInviteCreateChannels = _renderInviteCreateChannels;
+
+  const _renderInviteCodes = (list) => {
+    this._inviteCodes = Array.isArray(list) ? list : [];
+    const countEl = document.getElementById('invite-links-count');
+    if (countEl) {
+      const active = this._inviteCodes.filter(c => c.enabled && !c.is_expired).length;
+      countEl.textContent = this._inviteCodes.length ? `(${active} active / ${this._inviteCodes.length})` : '';
+    }
+    const host = document.getElementById('invite-codes-list');
+    if (!host) return;
+    if (!this._inviteCodes.length) {
+      host.innerHTML = '<p class="muted-text" style="margin:4px 0;font-size:0.85rem">No invite links yet. Create one below.</p>';
+      return;
+    }
+    // determine invite usage input limits
+    const parsedMaxInvtUses = parseInt(this.serverSettings?.max_invite_uses, 10);
+    const maxInvtUses = Number.isNaN(parsedMaxInvtUses) ? 0 : parsedMaxInvtUses;
+    const restrictUses = !this.user?.isAdmin && !this._hasPerm('manage_server') && maxInvtUses > 0;
+    const maxUsesInput = restrictUses ? maxInvtUses : 100000;
+    const minUsesInput = restrictUses ? 1 : 0;
+
+    const origin = window.location.origin;
+    host.innerHTML = this._inviteCodes.map(ic => {
+      const status = !ic.enabled
+        ? '<span style="color:var(--text-muted)">● Disabled</span>'
+        : ic.max_uses > 0 && ic.use_count >= ic.max_uses
+          ? '<span style="color:var(--text-secondary,#9498b3)">● Used</span>'
+          : ic.is_expired
+            ? '<span style="color:var(--danger,#e84a4a)">● Expired</span>'
+            : '<span style="color:var(--green,#43b581)">● Active</span>';
+      const link = `${origin}/?invite=${encodeURIComponent(ic.code)}`;
+      const chCount = (ic.channels && ic.channels.length)
+        ? `${ic.channels.length} channel${ic.channels.length === 1 ? '' : 's'}`
+        : 'all public channels';
+      const uses = ic.max_uses > 0 ? `${ic.use_count} / ${ic.max_uses}` : `${ic.use_count}`;
+      const expiry = ic.expires_at ? new Date(ic.expires_at).toLocaleString() : 'never';
+      const label = ic.label ? this._escapeHtml(ic.label) : '<em style="opacity:.6">(no label)</em>';
+      const editorChannels = _inviteChannelChecks('invite-edit-channel-cb',
+        (ic.channels && ic.channels.length) ? new Set(ic.channels) : null);
+      return `<div class="invite-code-card" data-id="${ic.id}" style="border:1px solid var(--border);border-radius:8px;padding:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <div style="font-weight:600">${label} &nbsp;<code style="font-size:.85rem">${this._escapeHtml(ic.code)}</code></div>
+          <div style="font-size:.8rem">${status}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <input type="text" readonly value="${this._escapeHtml(link)}" class="settings-text-input" style="flex:1;min-width:0;font-size:.8rem" data-role="invite-link">
+          <button class="btn-sm" data-act="copy" title="Copy link">📋</button>
+        </div>
+        <div style="font-size:.8rem;opacity:.8;margin-top:6px;display:flex;gap:12px;flex-wrap:wrap">
+          <span>Grants: ${chCount}</span><span>Uses: ${uses}</span><span>Expires: ${this._escapeHtml(expiry)}</span>
+        </div>
+        <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn-sm" data-act="toggle">${ic.enabled ? 'Disable' : 'Enable'}</button>
+          <button class="btn-sm" data-act="edit">Edit</button>
+          <button class="btn-sm" data-act="delete">Delete</button>
+        </div>
+        <div class="invite-code-editor" style="display:none;margin-top:10px;padding-top:8px;border-top:1px dashed var(--border)">
+          <h6 style="margin:0 0 4px;font-size:.8rem;font-weight:600">Channels this link grants</h6>
+          <div class="invite-edit-channels" style="max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px">${editorChannels}</div>
+          <div style="display:flex;gap:4px;margin-top:4px">
+            <button class="btn-sm" data-act="edit-all">Select all</button>
+            <button class="btn-sm" data-act="edit-none">Select none</button>
+          </div>
+          <label class="select-row" style="margin-top:8px"><span>Max uses (0 = unlimited)</span><input type="number" min="${minUsesInput}" max="${maxUsesInput}" value="${ic.max_uses || 0}" class="settings-number-input" data-role="edit-maxuses"></label>
+          <label class="select-row" style="margin-top:4px"><span>Reset expiry</span>
+            <select class="settings-number-input" data-role="edit-expiry" style="width: 6.5rem;">
+              <option value="-1" selected>Keep current</option>
+              <option value="0">Never</option>
+              <option value="1">After 1 hour</option>
+              <option value="24">After 1 day</option>
+              <option value="168">After 7 days</option>
+              <option value="720">After 30 days</option>
+            </select>
+          </label>
+          <div style="display:flex;gap:4px;margin-top:8px">
+            <button class="btn-sm btn-accent" data-act="save">Save changes</button>
+            <button class="btn-sm" data-act="cancel">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  };
+  this._renderInviteCodes = _renderInviteCodes;
+
+  this.socket.on('invite-codes-list', (list) => { _renderInviteCodes(list); });
+
+  // Create form: select all / none + create
+  document.getElementById('invite-new-channels-all')?.addEventListener('click', () => {
+    document.querySelectorAll('.invite-new-channel-cb').forEach(cb => { cb.checked = true; });
+  });
+  document.getElementById('invite-new-channels-none')?.addEventListener('click', () => {
+    document.querySelectorAll('.invite-new-channel-cb').forEach(cb => { cb.checked = false; });
+  });
+  document.getElementById('invite-create-btn')?.addEventListener('click', () => {
+    const label = document.getElementById('invite-new-label')?.value.trim() || '';
+    const cbs = Array.from(document.querySelectorAll('.invite-new-channel-cb'));
+    const total = cbs.length;
+    const picked = cbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.cid)).filter(Number.isFinite);
+    // All checked → [] = "grant all public" (future-proof as new channels appear).
+    const channels = (total > 0 && picked.length === total) ? [] : picked;
+
+    const maxUsesValue = document.getElementById('invite-new-maxuses')?.value;
+    const maxUses = maxUsesValue === '' ? 1 : parseInt(maxUsesValue);
+
+    const expiryValue = document.getElementById('invite-new-expiry')?.value;
+    const expiresInHours = expiryValue === '' ? 720 : parseInt(expiryValue);
+
+    const slug = document.getElementById('invite-new-slug')?.value.trim() || '';
+    const payload = { label, channels, maxUses, expiresInHours };
+    if (slug) payload.code = slug;
+    this.socket.emit('create-invite-code', payload);
+    // Reset the form fields (channel checks reset on the next list render).
+    const lblEl = document.getElementById('invite-new-label'); if (lblEl) lblEl.value = '';
+    const slugEl = document.getElementById('invite-new-slug'); if (slugEl) slugEl.value = '';
+    const muEl = document.getElementById('invite-new-maxuses'); if (muEl) muEl.value = '1';
+    const expEl = document.getElementById('invite-new-expiry'); if (expEl) expEl.value = '720';
+  });
+
+  // One delegated handler for all per-card actions (the list re-renders often).
+  document.getElementById('invite-codes-list')?.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const card = e.target.closest('.invite-code-card');
+    if (!card) return;
+    const id = parseInt(card.dataset.id);
+    const act = btn.dataset.act;
+    const ic = (this._inviteCodes || []).find(x => x.id === id);
+    if (act === 'copy') {
+      const input = card.querySelector('[data-role="invite-link"]');
+      const val = input?.value || '';
+      if (!val) return;
+      const done = () => this._showToast?.('Invite link copied', 'success');
+      // navigator.clipboard.writeText() rejects (or fails silently in Electron's
+      // BrowserView) when the document isn't focused, so fall back to selecting
+      // the field and execCommand('copy'). Only toast success if a copy worked.
+      const fallback = () => {
+        try {
+          if (input) { input.focus(); input.select(); }
+          const ok = document.execCommand('copy');
+          if (input) input.setSelectionRange(0, 0);
+          if (ok) { done(); return; }
+        } catch { /* fall through */ }
+        this._showToast?.('Press Ctrl+C to copy the selected link', 'info');
+      };
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(val).then(done).catch(fallback);
+      } else {
+        fallback();
+      }
+    } else if (act === 'toggle') {
+      this.socket.emit('update-invite-code', { id, enabled: ic ? !ic.enabled : true });
+    } else if (act === 'delete') {
+      if (confirm(`Delete invite link "${ic?.code || id}"? Anyone holding the old link won't be able to use it.`)) {
+        this.socket.emit('delete-invite-code', { id });
+      }
+    } else if (act === 'edit') {
+      const ed = card.querySelector('.invite-code-editor');
+      if (ed) ed.style.display = ed.style.display === 'none' ? '' : 'none';
+    } else if (act === 'cancel') {
+      const ed = card.querySelector('.invite-code-editor');
+      if (ed) ed.style.display = 'none';
+    } else if (act === 'edit-all') {
+      card.querySelectorAll('.invite-edit-channel-cb').forEach(cb => { cb.checked = true; });
+    } else if (act === 'edit-none') {
+      card.querySelectorAll('.invite-edit-channel-cb').forEach(cb => { cb.checked = false; });
+    } else if (act === 'save') {
+      const cbs = Array.from(card.querySelectorAll('.invite-edit-channel-cb'));
+      const total = cbs.length;
+      const picked = cbs.filter(cb => cb.checked).map(cb => parseInt(cb.dataset.cid)).filter(Number.isFinite);
+      const channels = (total > 0 && picked.length === total) ? [] : picked;
+      const maxUses = parseInt(card.querySelector('[data-role="edit-maxuses"]')?.value) || 0;
+      const payload = { id, channels, maxUses };
+      const exp = parseInt(card.querySelector('[data-role="edit-expiry"]')?.value);
+      if (Number.isFinite(exp) && exp >= 0) payload.expiresInHours = exp;
+      this.socket.emit('update-invite-code', payload);
+    }
+  });
+
+  // Invite Links popout — open/close. Refresh the list and create-form channels
+  // on open so the modal always reflects current state.
+  // Active sessions. Refreshed whenever the Account settings pane is opened
+  // rather than polled, since the list is only interesting while you look at it.
+  document.getElementById('revoke-sessions-btn')?.addEventListener('click', async () => {
+    const status = document.getElementById('sessions-status');
+    const pw = prompt(t('settings.sessions_section.confirm_prompt'));
+    if (pw === null) return;                       // cancelled
+    if (!pw) { status.textContent = t('settings.sessions_section.need_password'); return; }
+    status.classList.remove('error', 'success');
+    status.textContent = t('settings.sessions_section.working');
+    // Set before the request: the server disconnects every socket including
+    // ours, and this is what tells our own force-logout handler to sit still.
+    this._justRevokedSessions = true;
+    try {
+      const res = await fetch('/api/auth/revoke-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+        body: JSON.stringify({ password: pw })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        this._justRevokedSessions = false;
+        status.textContent = data.error || t('settings.sessions_section.failed');
+        status.classList.add('error');
+        return;
+      }
+      this.token = data.token;
+      localStorage.setItem('haven_token', data.token);
+      this.socket.auth.token = data.token;         // so the auto-reconnect authenticates
+      status.textContent = t('settings.sessions_section.done');
+      status.classList.add('success');
+    } catch {
+      this._justRevokedSessions = false;
+      status.textContent = t('settings.sessions_section.failed');
+      status.classList.add('error');
+    }
+  });
+
+  // Member search in the right sidebar. Re-rendering the roster from the last
+  // payload rather than asking the server keeps typing instant and costs the
+  // server nothing.
+  const userSearch = document.getElementById('user-search');
+  const userSearchClear = document.getElementById('user-search-clear');
+  const applyUserFilter = (value) => {
+    this._userFilter = value;
+    if (userSearchClear) userSearchClear.style.display = value ? '' : 'none';
+    if (this._lastOnlineUsers) this._renderOnlineUsers(this._lastOnlineUsers);
+  };
+  userSearch?.addEventListener('input', (e) => applyUserFilter(e.target.value));
+  userSearch?.addEventListener('keydown', (e) => {
+    // Escape clears rather than just blurring, which is what the key does in
+    // every other search box in the app.
+    if (e.key === 'Escape' && userSearch.value) {
+      e.stopPropagation();
+      userSearch.value = '';
+      applyUserFilter('');
+    }
+  });
+  userSearchClear?.addEventListener('click', () => {
+    if (userSearch) userSearch.value = '';
+    applyUserFilter('');
+    userSearch?.focus();
+  });
+
+  document.getElementById('open-invite-links-btn')?.addEventListener('click', () => {
+    this._openInviteLinksModal();
+  });
+  document.getElementById('right-btn-invite-popout')?.addEventListener('click', () => {
+    this._openInviteLinksModal();
+  });
+  document.getElementById('aml-view-invite-btn')?.addEventListener('click', () => {
+    this._openInviteLinksModal();
+  });
+  document.getElementById('close-invite-links-btn')?.addEventListener('click', () => {
+    const modal = document.getElementById('invite-links-modal');
+    if (modal) modal.style.display = 'none';
+  });
+  document.getElementById('invite-links-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+},
+
+// ═══════════════════════════════════════════════════════
+// CHANNEL & MESSAGE LINKS — copy/share deep-links
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Replace the native language <select> with a custom dropdown that can show
+ * real flag artwork.
+ *
+ * Windows browsers refuse to render Unicode regional-indicator flags and fall
+ * back to the bare two-letter code, so "🇬🇧 English" displayed as "GB English".
+ * The emoji picker already solved this by shipping SVGs (see builtinEmojis in
+ * app.js), but that fix can't apply here: an <option> element renders text
+ * only — no images, no markup — so no amount of CSS or emoji font work will
+ * put a flag inside a native select.
+ *
+ * The original <select> is kept in the DOM as the source of truth and still
+ * receives its 'change' event, so the existing i18n wiring is untouched; this
+ * only swaps the visible control.
+ */
+_buildLanguagePicker() {
+  const select = document.getElementById('language-select');
+  if (!select || !window.i18n) return;
+  select.value = i18n.preference;
+  i18n.buildLocalePicker(select);
+},
+
+_canShareChannelLink(code) {
+  if (!code) return false;
+  const ch = (this.channels || []).find(c => c.code === code);
+  if (!ch) return false;
+  if (ch.is_dm) return false;
+  return !(ch.is_private || ch.code_visibility === 'private');
+},
+
+/** Copy a MSG Arena-style deep link to a channel (and optionally a message) to the clipboard. */
+_copyChannelLink(code, messageId = null) {
+  if (!code) return;
+  if (!this._canShareChannelLink(code)) {
+    this._showToast?.(t('toasts.channel_link_unavailable') || 'Channel not available on this server', 'error');
+    return;
+  }
+  const base = `${window.location.origin}/app.html?channel=${encodeURIComponent(code)}`;
+  const url = messageId ? `${base}&message=${encodeURIComponent(messageId)}` : base;
+  const onCopied = () => {
+    const key = messageId ? 'toasts.message_link_copied' : 'toasts.channel_link_copied';
+    const fallback = messageId ? 'Message link copied' : 'Channel link copied';
+    this._showToast(t(key) || fallback, 'success');
+  };
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(onCopied).catch(() => this._copyTextFallback(url, onCopied));
+  } else {
+    this._copyTextFallback(url, onCopied);
+  }
+},
+
+_copyTextFallback(text, onCopied) {
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    onCopied?.();
+  } catch { /* could not copy */ }
+},
+
+/** Push the current server list to the server-side encrypted backup. */
+_pushServerListToServer() {
+  const wrappingKey = this._e2eWrappingKey || sessionStorage.getItem('haven_e2e_wrap') || null;
+  if (wrappingKey && this.serverManager && this.token) {
+    this.serverManager._pushToServer(this.token, wrappingKey).catch(() => {});
+  }
+},
+
+/** Push all ServerManager entries to Desktop's global server history.
+ *  This ensures servers discovered via encrypted sync propagate to
+ *  OTHER MSG Arena servers the next time the user switches. */
+_pushServersToDesktopHistory() {
+  if (!window.havenDesktop?.addServerHistory || !window.havenDesktop?.getServerHistory) return;
+  window.havenDesktop.getServerHistory().then(history => {
+    const historyUrls = new Set((history || []).map(h => h.url));
+    for (const s of this.serverManager.getAll()) {
+      if (!historyUrls.has(s.url)) {
+        window.havenDesktop.addServerHistory(s.url, s.name).catch(() => {});
+      }
+    }
+  }).catch(() => {});
+},
+
+// ═══════════════════════════════════════════════════════
+// SERVER BAR — multi-server with live status
+// ═══════════════════════════════════════════════════════
+
+/** (#5381) Lock down the UI for guest accounts:
+ *  hide the DM pane + split handle, hide settings affordances that
+ *  rely on password (E2E, recovery, etc.), and badge their nickname. */
+_applyGuestMode() {
+  if (!this.user || !this.user.isGuest) return;
+  const dmPane = document.getElementById('dm-pane');
+  if (dmPane) dmPane.style.display = 'none';
+  const split = document.getElementById('sidebar-split-handle');
+  if (split) split.style.display = 'none';
+  const dmPip = document.getElementById('dm-pip-panel');
+  if (dmPip) dmPip.style.display = 'none';
+  document.body.classList.add('is-guest');
+},
+
+_setupServerBar() {
+  this.serverManager.startPolling(30000);
+
+  // Desktop: merge Electron's server history into the web ServerManager
+  // so the sidebar shows ALL known servers even on first login to this server
+  if (window.havenDesktop?.getServerHistory) {
+    window.havenDesktop.getServerHistory().then(history => {
+      const historyUrls = new Set((history || []).map(h => h.url));
+      const removed = this.serverManager._loadRemoved();
+      let added = false;
+
+      // Add Desktop servers to web ServerManager (skip removed ones)
+      for (const h of (history || [])) {
+        if (!h.url) continue;
+        let normalizedUrl;
+        try { normalizedUrl = new URL(h.url).origin; } catch { normalizedUrl = h.url; }
+        if (removed.has(h.url) || removed.has(normalizedUrl)) continue;
+        if (this.serverManager.add(h.name || h.url, h.url)) {
+          added = true;
+        }
+      }
+
+      // Add web ServerManager servers to Desktop history
+      if (window.havenDesktop.addServerHistory) {
+        for (const s of this.serverManager.getAll()) {
+          if (!historyUrls.has(s.url)) {
+            window.havenDesktop.addServerHistory(s.url, s.name).catch(() => {});
+          }
+        }
+      }
+
+      // First-join scenario: if the synchronous preload bootstrap pulled in
+      // servers we didn't have locally OR if the async getServerHistory just
+      // added more, push the merged list to THIS server's encrypted backup
+      // immediately so the user is never stranded with an empty sidebar.
+      if (added || this.serverManager.bootstrappedFromDesktop) {
+        this._renderServerBar();
+        this._pushServerListToServer();
+      }
+    }).catch(() => {});
+  }
+
+  this._renderServerBar();
+  if (this._serverBarInterval) clearInterval(this._serverBarInterval);
+  this._serverBarInterval = setInterval(() => this._renderServerBar(), 30000);
+
+  // Re-render once the self-fingerprint resolves (hides "self" in sidebar)
+  this.serverManager.selfFingerprintReady?.then(() => this._renderServerBar());
+
+  // Desktop notification dots — listen for badge updates from main process
+  window.addEventListener('haven-server-badges', (e) => this._updateServerBadgeDots(e.detail));
+  window.havenDesktop?.getServerBadges?.().then(b => this._updateServerBadgeDots(b));
+
+  document.getElementById('home-server').addEventListener('click', () => {
+    // Already home — pulse the icon for fun
+    const el = document.getElementById('home-server');
+    el.classList.add('bounce');
+    setTimeout(() => el.classList.remove('bounce'), 400);
+  });
+
+  document.getElementById('add-server-btn').addEventListener('click', () => {
+    this._editingServerUrl = null;
+    document.getElementById('add-server-modal-title').textContent = t('modals.add_server.title');
+    document.getElementById('add-server-modal').style.display = 'flex';
+    document.getElementById('add-server-name-input').value = '';
+    document.getElementById('server-url-input').value = '';
+    document.getElementById('server-url-input').disabled = false;
+    document.getElementById('add-server-icon-input').value = '';
+    document.getElementById('save-server-btn').textContent = t('modals.add_server.add_btn');
+    this._populateKnownServersDatalist();
+    document.getElementById('add-server-name-input').focus();
+  });
+
+  document.getElementById('cancel-server-btn').addEventListener('click', () => {
+    document.getElementById('add-server-modal').style.display = 'none';
+    document.getElementById('server-url-input').disabled = false;
+    this._editingServerUrl = null;
+  });
+
+  document.getElementById('save-server-btn').addEventListener('click', () => this._addServer());
+
+  // Enter key in modal inputs
+  document.getElementById('server-url-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') this._addServer();
+  });
+
+  // Close modal on overlay click
+  document.getElementById('add-server-modal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+
+  // ── Manage Servers gear button & modal ──────────────
+  document.getElementById('manage-servers-btn')?.addEventListener('click', () => {
+    this._openManageServersModal();
+  });
+  document.getElementById('manage-servers-close-btn')?.addEventListener('click', () => {
+    document.getElementById('manage-servers-modal').style.display = 'none';
+  });
+  document.getElementById('manage-servers-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  document.getElementById('manage-servers-add-btn')?.addEventListener('click', () => {
+    document.getElementById('manage-servers-modal').style.display = 'none';
+    document.getElementById('add-server-btn').click();
+  });
+
+  // ── Sync Servers button ─────────────────────────────
+  document.getElementById('sync-servers-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('sync-servers-btn');
+    btn.classList.add('spinning');
+    try {
+      // 1. Pull from Desktop history (cross-server bridge)
+      if (window.havenDesktop?.getServerHistory) {
+        const history = await window.havenDesktop.getServerHistory();
+        const removed = this.serverManager._loadRemoved();
+        let added = false;
+        for (const h of (history || [])) {
+          if (!h.url) continue;
+          let normalizedUrl;
+          try { normalizedUrl = new URL(h.url).origin; } catch { normalizedUrl = h.url; }
+          if (removed.has(h.url) || removed.has(normalizedUrl)) continue;
+          if (this.serverManager.add(h.name || h.url, h.url)) added = true;
+        }
+        if (added) this._renderServerBar();
+      }
+
+      // 2. Pull from server-side encrypted backup
+      const syncKey = this._e2eWrappingKey || sessionStorage.getItem('haven_e2e_wrap') || null;
+      if (syncKey && this.serverManager && this.token) {
+        await this.serverManager.syncWithServer(this.token, syncKey);
+      }
+
+      // 3. Push merged list back to Desktop history + encrypted backup
+      this._pushServersToDesktopHistory();
+      this._pushServerListToServer();
+
+      // 4. Health-check all servers
+      await this.serverManager.checkAll();
+      this._renderServerBar();
+      this._showToast('Server list synced', 'success');
+    } catch {
+      this._showToast('Sync failed', 'error');
+    } finally {
+      btn.classList.remove('spinning');
+    }
+  });
+
+  // ── Channel Code Settings Modal ─────────────────────
+  document.getElementById('channel-code-settings-btn')?.addEventListener('click', () => {
+    if (!this.currentChannel) return;
+    const channel = this.channels.find(c => c.code === this.currentChannel);
+    if (!channel || channel.is_dm) return;
+    if (!this.user.isAdmin && !channel.canManageSettings) return; // (#5467) per channel, not "anywhere"
+
+    document.getElementById('code-settings-channel-name').textContent = `# ${channel.name}`;
+    document.getElementById('code-visibility-select').value = channel.code_visibility || 'public';
+    document.getElementById('code-mode-select').value = channel.code_mode || 'static';
+    document.getElementById('code-rotation-type-select').value = channel.code_rotation_type || 'time';
+    document.getElementById('code-rotation-interval').value = channel.code_rotation_interval || 60;
+
+    this._toggleCodeRotationFields();
+    document.getElementById('code-settings-modal').style.display = 'flex';
+  });
+
+  document.getElementById('code-mode-select')?.addEventListener('change', () => this._toggleCodeRotationFields());
+  document.getElementById('code-rotation-type-select')?.addEventListener('change', () => {
+    const type = document.getElementById('code-rotation-type-select').value;
+    const label = document.getElementById('rotation-interval-label');
+    if (label) label.textContent = type === 'time' ? t('modals.code_settings.interval_label') : t('modals.code_settings.rotate_after_joins');
+  });
+
+  document.getElementById('code-settings-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('code-settings-modal').style.display = 'none';
+  });
+
+  document.getElementById('code-settings-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+
+  document.getElementById('code-settings-save-btn')?.addEventListener('click', () => {
+    const channel = this.channels.find(c => c.code === this.currentChannel);
+    if (!channel) return;
+
+    this.socket.emit('update-channel-code-settings', {
+      channelId: channel.id,
+      code_visibility: document.getElementById('code-visibility-select').value,
+      code_mode: document.getElementById('code-mode-select').value,
+      code_rotation_type: document.getElementById('code-rotation-type-select').value,
+      code_rotation_interval: parseInt(document.getElementById('code-rotation-interval').value) || 60
+    });
+
+    document.getElementById('code-settings-modal').style.display = 'none';
+  });
+
+  document.getElementById('code-rotate-now-btn')?.addEventListener('click', () => {
+    const channel = this.channels.find(c => c.code === this.currentChannel);
+    if (!channel) return;
+
+    if (!confirm(t('confirm.rotate_channel_code'))) return;
+    this.socket.emit('rotate-channel-code', { channelId: channel.id });
+    document.getElementById('code-settings-modal').style.display = 'none';
+  });
+},
+
+_toggleCodeRotationFields() {
+  const isDynamic = document.getElementById('code-mode-select').value === 'dynamic';
+  document.getElementById('rotation-type-group').style.display = isDynamic ? '' : 'none';
+  document.getElementById('rotation-interval-group').style.display = isDynamic ? '' : 'none';
+  // Update interval label based on rotation type
+  const type = document.getElementById('code-rotation-type-select').value;
+  const label = document.getElementById('rotation-interval-label');
+  if (label) label.textContent = type === 'time' ? t('modals.code_settings.interval_label') : t('modals.code_settings.rotate_after_joins');
+},
+
+/** Populate the datalist in the Add Server modal with known servers from
+ *  the web ServerManager and (if in Desktop) the Electron server history. */
+async _populateKnownServersDatalist() {
+  const datalist = document.getElementById('known-servers-datalist');
+  if (!datalist) return;
+  datalist.innerHTML = '';
+
+  // Collect from web ServerManager
+  const known = new Map(); // url → name
+  for (const s of this.serverManager.getAll()) {
+    known.set(s.url, s.name || s.url);
+  }
+
+  // Collect from Desktop server history (if running in Electron)
+  if (window.havenDesktop?.getServerHistory) {
+    try {
+      const history = await window.havenDesktop.getServerHistory();
+      for (const h of (history || [])) {
+        if (h.url && !known.has(h.url)) known.set(h.url, h.name || h.url);
+      }
+    } catch { /* not available */ }
+  }
+
+  // Build datalist options
+  for (const [url, name] of known) {
+    const opt = document.createElement('option');
+    opt.value = url;
+    opt.label = name !== url ? name : '';
+    datalist.appendChild(opt);
+  }
+
+  // When the user picks a server from the list, auto-fill the name field
+  const urlInput = document.getElementById('server-url-input');
+  const nameInput = document.getElementById('add-server-name-input');
+  const onChange = () => {
+    const match = known.get(urlInput.value);
+    if (match && !nameInput.value) {
+      nameInput.value = match;
+    }
+  };
+  // Remove previous listener to avoid stacking
+  urlInput.removeEventListener('change', urlInput._knownServerHandler);
+  urlInput._knownServerHandler = onChange;
+  urlInput.addEventListener('change', onChange);
+},
+
+_addServer() {
+  const name = document.getElementById('add-server-name-input').value.trim();
+  const url = document.getElementById('server-url-input').value.trim();
+  const iconInput = document.getElementById('add-server-icon-input').value.trim();
+  const autoPull = document.getElementById('server-auto-icon').checked;
+  if (!name || !url) return this._showToast(t('toasts.name_address_required'), 'error');
+
+  const editUrl = this._editingServerUrl;
+  if (editUrl) {
+    // Editing existing server
+    this.serverManager.update(editUrl, { name, icon: iconInput || null });
+    this._editingServerUrl = null;
+    document.getElementById('add-server-modal').style.display = 'none';
+    this._renderServerBar();
+    this._showToast(t('toasts.server_updated', { name }), 'success');
+    // Auto-pull icon if checked
+    if (autoPull) this._autoPullServerIcon(editUrl);
+  } else {
+    // Adding new server
+    const icon = iconInput || null;
+    if (this.serverManager.add(name, url, icon, { userInitiated: true })) {
+      document.getElementById('add-server-modal').style.display = 'none';
+      this._renderServerBar();
+      this._showToast(t('toasts.server_added', { name }), 'success');
+      this._pushServerListToServer();
+      // Also add to Desktop server history so it persists across all servers
+      if (window.havenDesktop?.addServerHistory) {
+        const cleanUrl = url.replace(/\/+$/, '');
+        const finalUrl = /^https?:\/\//.test(cleanUrl) ? cleanUrl : 'https://' + cleanUrl;
+        window.havenDesktop.addServerHistory(finalUrl, name).catch(() => {});
+      }
+      // Auto-pull icon after health check completes
+      if (autoPull) {
+        const cleanUrl = url.replace(/\/+$/, '');
+        const finalUrl = /^https?:\/\//.test(cleanUrl) ? cleanUrl : 'https://' + cleanUrl;
+        setTimeout(() => this._autoPullServerIcon(finalUrl), 2000);
+      }
+    } else {
+      this._showToast(t('toasts.server_already_in_list'), 'error');
+    }
+  }
+},
+
+_autoPullServerIcon(url) {
+  const status = this.serverManager.statusCache.get(url);
+  if (status && status.icon) {
+    this.serverManager.update(url, { icon: status.icon });
+    this._renderServerBar();
+  }
+},
+
+_editServer(url) {
+  const server = this.serverManager.servers.find(s => s.url === url);
+  if (!server) return;
+  this._editingServerUrl = url;
+  document.getElementById('add-server-modal-title').textContent = t('modals.manage_servers.edit_title');
+  document.getElementById('add-server-name-input').value = server.name;
+  document.getElementById('server-url-input').value = server.url;
+  document.getElementById('server-url-input').disabled = true;
+  document.getElementById('add-server-icon-input').value = server.icon || '';
+  document.getElementById('save-server-btn').textContent = t('modals.common.save');
+  document.getElementById('add-server-modal').style.display = 'flex';
+  document.getElementById('add-server-name-input').focus();
+},
+
+_openManageServersModal() {
+  this._renderManageServersList();
+  document.getElementById('manage-servers-modal').style.display = 'flex';
+},
+
+_renderManageServersList() {
+  const container = document.getElementById('manage-servers-list');
+  const currentOrigin = window.location.origin;
+  const selfFp = this.serverManager.selfFingerprint;
+  const servers = this.serverManager.getAll().filter(s => {
+    if (selfFp && s.status.fingerprint === selfFp) return false;
+    try { return new URL(s.url).origin !== currentOrigin; } catch { return true; }
+  });
+  container.innerHTML = '';
+  if (servers.length === 0) return;  // CSS :empty handles empty state
+
+  let dragSrcRow = null;
+
+  servers.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'manage-server-row';
+    row.draggable = true;
+    row.dataset.url = s.url;
+
+    const online = s.status.online;
+    const statusClass = online === true ? 'online' : online === false ? 'offline' : 'unknown';
+    const statusText = online === true ? t('servers.online') : online === false ? t('servers.offline') : t('servers.checking');
+    const initial = s.name.charAt(0).toUpperCase();
+    const iconUrl = s.icon || (s.status.icon || null);
+    const iconContent = iconUrl
+      ? `<img src="${this._escapeHtml(iconUrl)}" alt="" class="manage-srv-icon-img">`
+      : initial;
+
+    row.innerHTML = `
+      <div class="manage-server-drag-handle" title="Drag to reorder">⠿</div>
+      <div class="manage-server-icon">${iconContent}</div>
+      <div class="manage-server-info">
+        <div class="manage-server-name">${this._escapeHtml(s.name)}</div>
+        <div class="manage-server-url">${this._escapeHtml(s.url)}</div>
+      </div>
+      <span class="manage-server-status ${statusClass}">${statusText}</span>
+      <div class="manage-server-actions">
+        <button class="manage-server-visit" title="${t('servers.open_tab')}">🔗</button>
+        <button class="manage-server-edit" title="${t('servers.edit')}">✏️</button>
+        <button class="manage-server-delete danger-action" title="${t('servers.remove')}">🗑️</button>
+      </div>
+    `;
+
+    // ── Drag-and-drop handlers ──
+    row.addEventListener('dragstart', (e) => {
+      dragSrcRow = row;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', s.url);
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      container.querySelectorAll('.manage-server-row').forEach(r => r.classList.remove('drag-over-above', 'drag-over-below'));
+      dragSrcRow = null;
+    });
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (dragSrcRow === row) return;
+      const rect = row.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      row.classList.toggle('drag-over-above', e.clientY < mid);
+      row.classList.toggle('drag-over-below', e.clientY >= mid);
+    });
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over-above', 'drag-over-below');
+    });
+    row.addEventListener('drop', (e) => {
+      e.preventDefault();
+      row.classList.remove('drag-over-above', 'drag-over-below');
+      if (!dragSrcRow || dragSrcRow === row) return;
+      const rect = row.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (e.clientY < mid) {
+        container.insertBefore(dragSrcRow, row);
+      } else {
+        container.insertBefore(dragSrcRow, row.nextSibling);
+      }
+      // Persist the new order
+      const orderedUrls = [...container.querySelectorAll('.manage-server-row')].map(r => r.dataset.url);
+      this.serverManager.reorder(orderedUrls);
+      this._renderServerBar();
+      this._pushServerListToServer();
+    });
+
+    row.querySelector('.manage-server-visit').addEventListener('click', () => {
+      if (window.havenDesktop?.switchServer) {
+        window.havenDesktop.switchServer(s.url);
+      } else {
+        window.open(s.url, '_blank', 'noopener');
+      }
+    });
+    row.querySelector('.manage-server-edit').addEventListener('click', () => {
+      document.getElementById('manage-servers-modal').style.display = 'none';
+      this._editServer(s.url);
+    });
+    row.querySelector('.manage-server-delete').addEventListener('click', () => {
+      if (!confirm(t('confirm.remove_server', { name: s.name }))) return;
+      this.serverManager.markRemoved(s.url);
+      this.serverManager.remove(s.url);
+      // Also drop from Desktop's cross-server history so it stops getting
+      // re-merged into other servers' sidebars on the next sync.
+      window.havenDesktop?.removeServerHistory?.(s.url)?.catch?.(() => {});
+      this._renderServerBar();
+      this._renderManageServersList();
+      this._showToast(t('toasts.server_removed_named', { name: s.name }), 'success');
+      this._pushServerListToServer();
+    });
+
+    // CSP-safe icon error handling: hide broken img, show initial letter
+    const iconImg = row.querySelector('.manage-srv-icon-img');
+    if (iconImg) {
+      iconImg.addEventListener('error', () => {
+        iconImg.style.display = 'none';
+        iconImg.parentElement.textContent = initial;
+      });
+    }
+
+    container.appendChild(row);
+  });
+},
+
+_updateServerBadgeDots(payload) {
+  if (!payload) return;
+  // Payload shape evolved: old code sent `{ url: bool }` directly, new code
+  // sends `{ badges: { url: bool }, names: { url: 'Name' } }`. Accept both
+  // so a stale renderer talking to a fresh main (or vice-versa) doesn't
+  // wipe its dots. (#5337)
+  let badges, names;
+  if (payload && typeof payload === 'object' && payload.badges && typeof payload.badges === 'object') {
+    badges = payload.badges; names = payload.names || {};
+  } else {
+    badges = payload; names = {};
+  }
+  // Cache so _renderServerBar can reapply dots immediately after a re-render
+  // instead of waiting for the next haven-server-badges event. (#5300)
+  this._lastServerBadges = { badges, names };
+  // Main process keys serverBadgeState by normalized URL (no trailing slash,
+  // no /app or /app.html, no query/hash). The DOM stores the raw user-entered
+  // URL, so a direct lookup misses for any server that doesn't already happen
+  // to match exactly. Normalize both sides before comparing.
+  const norm = (raw) => {
+    let v = String(raw || '').trim();
+    if (!v) return '';
+    if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+    try {
+      const u = new URL(v);
+      u.hash = ''; u.search = '';
+      let p = (u.pathname || '/').replace(/\/+$/, '') || '/';
+      p = p.replace(/\/app(?:\.html)?$/i, '') || '/';
+      p = p.replace(/\/+$/, '') || '/';
+      return p === '/' ? u.origin : u.origin + p;
+    } catch {
+      return v.replace(/\/+$/, '');
+    }
+  };
+  const normalized = {};
+  for (const [k, v] of Object.entries(badges)) normalized[norm(k)] = v;
+  // Track which normalized URLs are attached to a real sidebar icon. The
+  // current view's own origin never has an icon in its own sidebar (filtered
+  // out as "self"), so treat it as covered.
+  const covered = new Set();
+  try { covered.add(norm(window.location.origin)); } catch {}
+  document.querySelectorAll('#server-list .server-icon.remote').forEach(el => {
+    const url = el.dataset.url;
+    const dot = el.querySelector('.server-unread-dot');
+    if (!dot) return;
+    const nUrl = norm(url);
+    covered.add(nUrl);
+    const count = normalized[nUrl] || normalized[url] || badges[url] || 0;
+    dot.classList.toggle('active', count > 0);
+  });
+  // Auto-recover for the long-standing taskbar-lit / sidebar-blank desync:
+  // when a background server fires a badge but no icon exists for it in
+  // this view's curated sidebar (per-view localStorage, alias URLs, etc),
+  // add it as a real sidebar icon using serverManager.add(). The next
+  // _renderServerBar pass will paint a proper icon (real name from the
+  // broadcast name map, real avatar fetched from /api/health, real click-
+  // to-switch behavior) and re-apply the unread dot via _lastServerBadges.
+  // (#5337)
+  let autoAdded = false;
+  this._autoAddedUnreadUrls = this._autoAddedUnreadUrls || new Set();
+  if (this.serverManager && typeof this.serverManager.add === 'function') {
+    for (const [nUrl, hasUnread] of Object.entries(normalized)) {
+      if (!hasUnread) continue;
+      if (covered.has(nUrl)) continue;
+      // Per-session guard so a server the user actively removes mid-session
+      // doesn't ping-pong back in on every badge tick.
+      if (this._autoAddedUnreadUrls.has(nUrl)) continue;
+      const name = (names && (names[nUrl] || names[nUrl + '/'])) || (() => {
+        try { return new URL(nUrl).hostname; } catch { return nUrl; }
+      })();
+      // userInitiated:true clears any stale "removed" flag — surfacing an
+      // unread badge counts as the user implicitly wanting that server back.
+      if (this.serverManager.add(name, nUrl, null, { userInitiated: true })) {
+        this._autoAddedUnreadUrls.add(nUrl);
+        autoAdded = true;
+      }
+    }
+  }
+  if (autoAdded) {
+    // _renderServerBar re-calls _updateServerBadgeDots(this._lastServerBadges)
+    // at the end of its work, so the new icon gets its dot in the next pass.
+    this._renderServerBar();
+    return;
+  }
+  // Report the URLs we can actually surface back to main so taskbar
+  // recomputation can drop phantom unreads from background-preloaded
+  // servers no view can display. (#5269)
+  this._reportKnownServerUrls();
+},
+
+// Drag-and-drop reordering of remote server icons in the sidebar.
+// Mirrors the channel sidebar drag pattern: event delegation on the list
+// container, drop reorders the underlying ServerManager list, then
+// re-renders. Idempotent — only attaches handlers once per list element.
+_setupServerBarDrag(list) {
+  if (!list || list._serverDragSetup) return;
+  list._serverDragSetup = true;
+
+  const indicator = document.createElement('div');
+  indicator.className = 'server-drop-indicator';
+
+  const cleanup = () => {
+    if (list._serverDragSrc) list._serverDragSrc.classList.remove('server-dragging');
+    list._serverDragSrc = null;
+    indicator.remove();
+  };
+
+  list.addEventListener('dragstart', (e) => {
+    const el = e.target.closest('.server-icon.remote[draggable="true"]');
+    if (!el) return;
+    list._serverDragSrc = el;
+    el.classList.add('server-dragging');
+    try { e.dataTransfer.effectAllowed = 'move'; } catch {}
+    try { e.dataTransfer.setData('text/plain', el.dataset.url || ''); } catch {}
+  });
+
+  list.addEventListener('dragover', (e) => {
+    if (!list._serverDragSrc) return;
+    e.preventDefault();
+    try { e.dataTransfer.dropEffect = 'move'; } catch {}
+    const tgt = e.target.closest('.server-icon.remote');
+    if (!tgt || tgt === list._serverDragSrc) { indicator.remove(); return; }
+    const rect = tgt.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height / 2;
+    if (before) list.insertBefore(indicator, tgt);
+    else list.insertBefore(indicator, tgt.nextSibling);
+  });
+
+  list.addEventListener('dragleave', (e) => {
+    if (!list.contains(e.relatedTarget)) indicator.remove();
+  });
+
+  list.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const src = list._serverDragSrc;
+    if (!src || !indicator.parentNode) { cleanup(); return; }
+    indicator.parentNode.insertBefore(src, indicator);
+    indicator.remove();
+    src.classList.remove('server-dragging');
+    list._serverDragSrc = null;
+    const orderedUrls = Array.from(list.querySelectorAll('.server-icon.remote')).map(el => el.dataset.url);
+    if (this.serverManager?.reorder) {
+      this.serverManager.reorder(orderedUrls);
+      this._pushServerListToServer?.();
+      this._renderServerBar();
+    }
+  });
+
+  list.addEventListener('dragend', cleanup);
+},
+
+// Tell the desktop main process which server URLs this view recognises
+// (its own origin + every remote icon currently in its sidebar). Main
+// uses this to filter the taskbar overlay so it never shows a badge for
+// a server the user can't see/visit from any open view.
+_reportKnownServerUrls() {
+  if (!window.havenDesktop?.reportKnownServerUrls) return;
+  const norm = (raw) => {
+    let v = String(raw || '').trim();
+    if (!v) return '';
+    if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+    try {
+      const u = new URL(v);
+      u.hash = ''; u.search = '';
+      let p = (u.pathname || '/').replace(/\/+$/, '') || '/';
+      p = p.replace(/\/app(?:\.html)?$/i, '') || '/';
+      p = p.replace(/\/+$/, '') || '/';
+      return p === '/' ? u.origin : u.origin + p;
+    } catch { return v.replace(/\/+$/, ''); }
+  };
+  const known = new Set();
+  known.add(norm(window.location.origin));
+  document.querySelectorAll('#server-list .server-icon.remote').forEach(el => {
+    const u = norm(el.dataset.url);
+    if (u) known.add(u);
+  });
+  try { window.havenDesktop.reportKnownServerUrls(Array.from(known)); } catch { /* ignore */ }
+},
+
+// Append a stable cache-buster query param to icon URLs. This forces the
+// browser to bypass any pre-CORS cached response for the same image (which
+// causes "No Access-Control-Allow-Origin" errors when a non-crossorigin
+// load was cached without the proper Vary: Origin header). See #5240.
+_withCacheBust(url) {
+  if (!url || typeof url !== 'string') return url;
+  if (url.startsWith('data:') || url.startsWith('blob:')) return url;
+  // 'cors2' marks the post-Vary/CORP header fix; bump if the cache invariant changes again.
+  const tag = 'cors2';
+  return url + (url.includes('?') ? '&' : '?') + '_cb=' + tag;
+},
+
+_renderServerBar() {
+  const list = document.getElementById('server-list');
+  const currentOrigin = window.location.origin;
+  const selfFp = this.serverManager.selfFingerprint;
+  const servers = this.serverManager.getAll().filter(s => {
+    if (selfFp && s.status.fingerprint === selfFp) return false;
+    try { return new URL(s.url).origin !== currentOrigin; } catch { return true; }
+  });
+
+  list.innerHTML = servers.map(s => {
+    const initial = s.name.charAt(0).toUpperCase();
+    const online = s.status.online;
+    const statusClass = online === true ? 'online' : online === false ? 'offline' : 'unknown';
+    const statusText = online === true ? '● ' + t('servers.online') : online === false ? '○ ' + t('servers.offline') : '◌ ' + t('servers.checking');
+    // Use custom icon, auto-pulled icon from health check, or letter initial
+    const iconUrl = s.icon || (s.status.icon || null);
+    // Append a stable cache-buster so browsers don't reuse a bad pre-CORS
+    // cached response (which causes "No Access-Control-Allow-Origin" errors
+    // on icons that were loaded once without the crossorigin attribute). See #5240.
+    const bustedIcon = iconUrl ? this._withCacheBust(iconUrl) : null;
+    const iconContent = bustedIcon
+      ? `<img src="${this._escapeHtml(bustedIcon)}" class="server-icon-img" crossorigin="anonymous"${s.iconData ? ` data-fallback-src="${this._escapeHtml(s.iconData)}"` : ''} alt=""><span class="server-icon-text" style="display:none">${this._escapeHtml(initial)}</span>`
+      : (s.iconData
+        ? `<img src="${this._escapeHtml(s.iconData)}" class="server-icon-img" alt=""><span class="server-icon-text" style="display:none">${this._escapeHtml(initial)}</span>`
+        : `<span class="server-icon-text">${this._escapeHtml(initial)}</span>`);
+    return `
+      <div class="server-icon remote" data-url="${this._escapeHtml(s.url)}" draggable="true"
+           title="${this._escapeHtml(s.name)} — ${statusText}">
+        ${iconContent}
+        <span class="server-status-dot ${statusClass}"></span>
+        ${window.havenDesktop ? '<span class="server-unread-dot"></span>' : ''}
+        <button class="server-remove" title="${t('servers.remove')}">&times;</button>
+      </div>
+    `;
+  }).join('');
+
+  // CSP-safe: handle broken server icons, fall back to thumbnail or letter initial
+  list.querySelectorAll('.server-icon-img').forEach(img => {
+    img.addEventListener('error', () => {
+      const fallbackSrc = img.dataset.fallbackSrc;
+      if (fallbackSrc && img.src !== fallbackSrc) {
+        img.removeAttribute('data-fallback-src');
+        img.src = fallbackSrc;
+        return;
+      }
+      img.style.display = 'none';
+      const fallback = img.nextElementSibling;
+      if (fallback) fallback.style.display = '';
+    });
+  });
+
+  list.querySelectorAll('.server-icon.remote').forEach(el => {
+    el.addEventListener('click', (e) => {
+      if (e.target.classList.contains('server-remove')) {
+        e.stopPropagation();
+        const serverName = el.getAttribute('title')?.split(' — ')[0] || el.dataset.url;
+        if (!confirm(t('confirm.remove_server', { name: serverName }))) return;
+        this.serverManager.markRemoved(el.dataset.url);
+        this.serverManager.remove(el.dataset.url);
+        // Also drop from Desktop's cross-server history so it stops getting
+        // re-merged into other servers' sidebars on the next sync.
+        window.havenDesktop?.removeServerHistory?.(el.dataset.url)?.catch?.(() => {});
+        this._renderServerBar();
+        this._showToast(t('toasts.server_removed'), 'success');
+        this._pushServerListToServer();
+        return;
+      }
+      if (window.havenDesktop?.switchServer) {
+        window.havenDesktop.switchServer(el.dataset.url);
+      } else {
+        window.open(el.dataset.url, '_blank', 'noopener');
+      }
+    });
+    // Right-click to edit
+    el.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this._editServer(el.dataset.url);
+    });
+  });
+
+  // Drag-and-drop reordering of remote server icons. Idempotent: handlers
+  // live on the list container so re-rendering doesn't double-bind.
+  this._setupServerBarDrag(list);
+
+  // Also update mobile sidebar server bubbles
+  this._renderMobileSidebarServers();
+
+  // After re-rendering the bar, the set of known server URLs may have
+  // changed — tell main so it can drop phantom taskbar badges from
+  // background views the user no longer has an icon for. (#5269)
+  this._reportKnownServerUrls();
+
+  // Re-apply cached badge dots — _renderServerBar wipes innerHTML so any
+  // previously lit dots are destroyed. Reapply immediately from the last
+  // known badge state so dots don't vanish until the next IPC event. (#5300)
+  if (this._lastServerBadges) this._updateServerBadgeDots(this._lastServerBadges);
+},
+
+// ═══════════════════════════════════════════════════════
+// IMAGE UPLOAD — button, paste, drag & drop
+// ═══════════════════════════════════════════════════════
+
+_setupImageUpload() {
+  const fileInput = document.getElementById('file-input');
+  const uploadBtn = document.getElementById('upload-btn');
+  const messageArea = document.getElementById('message-area');
+
+  uploadBtn.addEventListener('click', () => {
+    if (!this.currentChannel) return this._showToast(t('toasts.select_channel_first'), 'error');
+    fileInput.click();
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (!fileInput.files[0]) return;
+    const file = fileInput.files[0];
+    if (file.type.startsWith('image/')) {
+      this._queueImage(file);
+    } else {
+      this._queueGeneralFile(file);
+    }
+    fileInput.value = '';
+  });
+
+  // Paste from clipboard — images (incl. SVG) get queued for preview; non-image
+  // files now also queue (#5417) rather than uploading on paste.
+  document.getElementById('message-input').addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        e.preventDefault();
+        this._queueImage(item.getAsFile());
+        return;
+      }
+      if (item.kind === 'file') {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) this._queueGeneralFile(file);
+        return;
+      }
+    }
+  });
+
+  // Drag & drop — QUEUE instead of uploading immediately
+  messageArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    messageArea.classList.add('drag-over');
+  });
+
+  messageArea.addEventListener('dragleave', () => {
+    messageArea.classList.remove('drag-over');
+  });
+
+  messageArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    messageArea.classList.remove('drag-over');
+    const file = e.dataTransfer?.files[0];
+    if (!file) return;
+    if (file.type.startsWith('image/')) {
+      this._queueImage(file);
+    } else {
+      this._queueGeneralFile(file);
+    }
+  });
+},
+
+// ═══════════════════════════════════════════════════════
+// MOBILE — hamburger, overlay, swipe gestures
+// ═══════════════════════════════════════════════════════
+
+_setupMobile() {
+  const menuBtn = document.getElementById('mobile-menu-btn');
+  const usersBtn = document.getElementById('mobile-users-btn');
+  const overlay = document.getElementById('mobile-overlay');
+  const appBody = document.getElementById('app-body');
+
+  // Hamburger — toggle left sidebar
+  menuBtn.addEventListener('click', () => {
+    const isOpen = appBody.classList.toggle('mobile-sidebar-open');
+    appBody.classList.remove('mobile-right-open');
+    if (isOpen) overlay.classList.add('active');
+    else overlay.classList.remove('active');
+  });
+
+  // Users button — toggle right sidebar
+  usersBtn.addEventListener('click', () => {
+    const isOpen = appBody.classList.toggle('mobile-right-open');
+    appBody.classList.remove('mobile-sidebar-open');
+    if (isOpen) overlay.classList.add('active');
+    else overlay.classList.remove('active');
+  });
+
+  // Overlay click — close everything
+  overlay.addEventListener('click', () => this._closeMobilePanels());
+
+  // Close buttons inside panels
+  document.getElementById('mobile-sidebar-close')?.addEventListener('click', () => this._closeMobilePanels());
+  document.getElementById('mobile-right-close')?.addEventListener('click', () => this._closeMobilePanels());
+
+  // Close sidebar when switching channels on mobile
+  const origSwitch = this.switchChannel.bind(this);
+  this.switchChannel = (code) => {
+    origSwitch(code);
+    this._closeMobilePanels();
+  };
+
+  // Swipe gesture support (touch)
+  let touchStartX = 0;
+  let touchStartY = 0;
+  const SWIPE_THRESHOLD = 60;
+
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    // Only process horizontal swipes (not scrolling)
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dy) > Math.abs(dx)) return;
+
+    if (dx > 0 && touchStartX < 40) {
+      // Swipe right from left edge → open left sidebar
+      appBody.classList.add('mobile-sidebar-open');
+      appBody.classList.remove('mobile-right-open');
+      overlay.classList.add('active');
+    } else if (dx < 0 && touchStartX > window.innerWidth - 40) {
+      // Swipe left from right edge → open right sidebar
+      appBody.classList.add('mobile-right-open');
+      appBody.classList.remove('mobile-sidebar-open');
+      overlay.classList.add('active');
+    } else if (dx < 0 && appBody.classList.contains('mobile-sidebar-open')) {
+      this._closeMobilePanels();
+    } else if (dx > 0 && appBody.classList.contains('mobile-right-open')) {
+      this._closeMobilePanels();
+    }
+  }, { passive: true });
+
+  // ── Mobile server dropdown ──
+  const mobileServerBtn = document.getElementById('mobile-server-btn');
+  const mobileServerMenu = document.getElementById('mobile-server-menu');
+  if (mobileServerBtn && mobileServerMenu) {
+    mobileServerBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._renderMobileServerList();
+      mobileServerMenu.classList.toggle('open');
+    });
+    document.addEventListener('click', () => mobileServerMenu.classList.remove('open'));
+    mobileServerMenu.addEventListener('click', (e) => e.stopPropagation());
+    document.getElementById('mobile-server-add-btn')?.addEventListener('click', () => {
+      mobileServerMenu.classList.remove('open');
+      this._editingServerUrl = null;
+      document.getElementById('add-server-modal-title').textContent = t('modals.add_server.title');
+      document.getElementById('add-server-modal').style.display = 'flex';
+      document.getElementById('add-server-name-input').value = '';
+      document.getElementById('server-url-input').value = '';
+      document.getElementById('server-url-input').disabled = false;
+      document.getElementById('add-server-icon-input').value = '';
+      document.getElementById('save-server-btn').textContent = t('modals.add_server.add_btn');
+      document.getElementById('add-server-name-input').focus();
+    });
+  }
+
+  // ── Mobile message actions: ⋯ button ──
+  // Detect touch capability broadly: matchMedia OR ontouchstart presence.
+  const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches
+                     || window.matchMedia('(pointer: coarse)').matches
+                     || 'ontouchstart' in window
+                     || navigator.maxTouchPoints > 0;
+  if (isTouchDevice) {
+    const messagesEl = document.getElementById('messages');
+    let _suppressDismissUntil = 0;
+    // Hide the old floating singleton "⋯" button — each message now has its own
+    const oldMoreBtn = document.getElementById('msg-more-btn');
+    if (oldMoreBtn) oldMoreBtn.style.display = 'none';
+
+    const _deselectAll = () => {
+      messagesEl.querySelectorAll('.msg-selected').forEach(el => {
+        el.classList.remove('msg-selected');
+        const toolbar = el.querySelector('.msg-toolbar');
+        if (toolbar) toolbar.style.removeProperty('display');
+      });
+    };
+
+    const _selectMsg = (msgEl) => {
+      if (!msgEl) return;
+      _deselectAll();
+      msgEl.classList.add('msg-selected');
+      // Touch interactions often emit a synthetic click right after selection.
+      // Ignore dismiss logic briefly so the toolbar stays open.
+      _suppressDismissUntil = Date.now() + 450;
+      // Force immediate visual update on touch browsers where class-based
+      // CSS can paint one interaction late.
+      const toolbar = msgEl.querySelector('.msg-toolbar');
+      if (toolbar) toolbar.style.setProperty('display', 'flex', 'important');
+      if (navigator.vibrate) navigator.vibrate(15);
+      requestAnimationFrame(() => {
+        if (!msgEl.classList.contains('msg-selected')) return;
+        const tb = msgEl.querySelector('.msg-toolbar');
+        if (tb) tb.style.setProperty('display', 'flex', 'important');
+      });
+    };
+
+    // Suppress the browser's native context menu so it doesn't
+    // compete with our custom toolbar.
+    messagesEl.addEventListener('contextmenu', (e) => {
+      if (e.target.classList.contains('chat-image')) return;
+      const msgEl = e.target.closest('.message, .message-compact');
+      if (msgEl) e.preventDefault();
+    });
+
+    // ── Inline ⋯ button: always visible on each message ──
+    // Tapping it toggles msg-selected which reveals the full toolbar.
+    messagesEl.addEventListener('click', (e) => {
+      const dotsBtn = e.target.closest('.msg-dots-btn');
+      if (dotsBtn) {
+        e.stopPropagation();
+        e.preventDefault();
+        const msgEl = dotsBtn.closest('.message, .message-compact');
+        if (!msgEl) return;
+        const wasSelected = msgEl.classList.contains('msg-selected');
+        _deselectAll();
+        if (!wasSelected) _selectMsg(msgEl);
+        return;
+      }
+      // Any non-toolbar/non-dots tap should dismiss the current toolbar.
+      // This keeps mobile behavior consistent: tap elsewhere = close actions.
+      if (!e.target.closest('.msg-toolbar')) {
+        if (Date.now() < _suppressDismissUntil) return;
+        _deselectAll();
+      }
+      // Let toolbar button taps through
+      if (e.target.closest('.msg-toolbar')) return;
+      // Let interactive elements through
+      if (e.target.closest('a') || e.target.closest('.reaction-badge') ||
+          e.target.closest('.spoiler') || e.target.closest('.reply-banner')) return;
+      // Don't interfere with author/avatar clicks (profile popup)
+      if (e.target.closest('.message-author') || e.target.closest('.message-avatar') ||
+          e.target.closest('.message-avatar-img')) return;
+      // Let images through (lightbox etc)
+      if (e.target.closest('img')) return;
+    });
+
+    // Dismiss on touch outside messages
+    document.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.msg-toolbar') || e.target.closest('.msg-dots-btn')) return;
+      if (!e.target.closest('#messages')) {
+        _deselectAll();
+      }
+    }, { passive: true });
+
+    // Deselect when focusing input area
+    document.getElementById('message-input').addEventListener('focus', () => {
+      _deselectAll();
+    });
+
+    // Deselect on significant scroll (debounced, threshold-based)
+    let _scrollStart = null;
+    messagesEl.addEventListener('scroll', () => {
+      if (_scrollStart === null) _scrollStart = messagesEl.scrollTop;
+      if (Math.abs(messagesEl.scrollTop - _scrollStart) > 30) {
+        _deselectAll();
+        _scrollStart = null;
+      }
+    }, { passive: true });
+    messagesEl.addEventListener('touchstart', () => {
+      _scrollStart = messagesEl.scrollTop;
+    }, { passive: true });
+  }
+},
+
+_closeMobilePanels() {
+  const appBody = document.getElementById('app-body');
+  const overlay = document.getElementById('mobile-overlay');
+  appBody.classList.remove('mobile-sidebar-open', 'mobile-right-open');
+  overlay.classList.remove('active');
+},
+
+_renderMobileServerList() {
+  const list = document.getElementById('mobile-server-list');
+  if (!list || !this.serverManager) return;
+  const servers = this.serverManager.getAll();
+  if (servers.length === 0) {
+    list.innerHTML = `<div style="padding:8px 10px;color:var(--text-muted);font-size:0.75rem;">${t('servers.no_servers')}</div>`;
+    return;
+  }
+  list.innerHTML = servers.map(s => {
+    const initial = s.name.charAt(0).toUpperCase();
+    const online = s.status.online;
+    const dotClass = online === true ? 'online' : online === false ? 'offline' : 'unknown';
+    const iconUrl = s.icon || (s.status.icon || null);
+    const bustedIcon = iconUrl ? this._withCacheBust(iconUrl) : null;
+    const iconHtml = bustedIcon
+      ? `<img src="${this._escapeHtml(bustedIcon)}" class="msrv-icon" alt="" crossorigin="anonymous">`
+      + `<span class="msrv-initial" style="display:none">${initial}</span>`
+      : `<span class="msrv-initial">${initial}</span>`;
+    return `<a class="mobile-server-item" href="${this._escapeHtml(s.url)}" target="_blank" rel="noopener">
+      <span class="msrv-dot ${dotClass}"></span>
+      ${iconHtml}
+      <span>${this._escapeHtml(s.name)}</span>
+    </a>`;
+  }).join('');
+  list.querySelectorAll('.msrv-icon').forEach(img => {
+    img.addEventListener('error', () => {
+      img.style.display = 'none';
+      if (img.nextElementSibling) img.nextElementSibling.style.display = '';
+    });
+  });
+},
+
+// ═══════════════════════════════════════════════════════
+// MOBILE SIDEBAR SERVER BUBBLES
+// ═══════════════════════════════════════════════════════
+
+_renderMobileSidebarServers() {
+  const scroll = document.getElementById('mobile-servers-scroll');
+  if (!scroll || !this.serverManager) return;
+  const currentOrigin = window.location.origin;
+  const selfFp = this.serverManager.selfFingerprint;
+  const servers = this.serverManager.getAll().filter(s => {
+    if (selfFp && s.status.fingerprint === selfFp) return false;
+    try { return new URL(s.url).origin !== currentOrigin; } catch { return true; }
+  });
+  if (servers.length === 0) {
+    scroll.innerHTML = `<span class="mobile-servers-empty">${t('servers.no_servers')}</span>`;
+    return;
+  }
+  scroll.innerHTML = servers.map(s => {
+    const initial = s.name.charAt(0).toUpperCase();
+    const online = s.status.online;
+    const dotClass = online === true ? 'online' : online === false ? 'offline' : 'unknown';
+    const iconUrl = s.icon || (s.status.icon || null);
+    const bustedIcon = iconUrl ? this._withCacheBust(iconUrl) : null;
+    const iconHtml = bustedIcon
+      ? `<img src="${this._escapeHtml(bustedIcon)}" alt="${this._escapeHtml(initial)}" class="mobile-srv-icon-img" crossorigin="anonymous">`
+      : `<span>${this._escapeHtml(initial)}</span>`;
+    return `<a class="mobile-srv-bubble" href="${this._escapeHtml(s.url)}" target="_blank" rel="noopener" title="${this._escapeHtml(s.name)}">
+      ${iconHtml}
+      <span class="msrv-status ${dotClass}"></span>
+    </a>`;
+  }).join('');
+
+  // CSP-safe: handle broken server icons, fall back to letter initial
+  scroll.querySelectorAll('.mobile-srv-icon-img').forEach(img => {
+    img.addEventListener('error', () => {
+      const initial = img.alt || '?';
+      const span = document.createElement('span');
+      span.textContent = initial;
+      img.replaceWith(span);
+    });
+  });
+},
+
+_setupMobileSidebarServers() {
+  // Toggle collapse
+  const toggle = document.getElementById('mobile-servers-toggle');
+  const arrow = document.getElementById('mobile-servers-arrow');
+  const row = document.getElementById('mobile-servers-row');
+  if (toggle && row) {
+    const collapsed = localStorage.getItem('haven_mobile_servers_collapsed') === '1';
+    if (collapsed) {
+      arrow?.classList.add('collapsed');
+      row.classList.add('collapsed');
+    }
+    toggle.addEventListener('click', () => {
+      const isCollapsed = row.classList.toggle('collapsed');
+      arrow?.classList.toggle('collapsed', isCollapsed);
+      localStorage.setItem('haven_mobile_servers_collapsed', isCollapsed ? '1' : '0');
+    });
+  }
+  // Add-server button
+  document.getElementById('mobile-srv-add-btn')?.addEventListener('click', () => {
+    this._editingServerUrl = null;
+    document.getElementById('add-server-modal-title').textContent = t('modals.add_server.title');
+    document.getElementById('add-server-modal').style.display = 'flex';
+    document.getElementById('add-server-name-input').value = '';
+    document.getElementById('server-url-input').value = '';
+    document.getElementById('server-url-input').disabled = false;
+    document.getElementById('add-server-icon-input').value = '';
+    document.getElementById('save-server-btn').textContent = t('modals.add_server.add_btn');
+    document.getElementById('add-server-name-input').focus();
+  });
+  // Initial render
+  this._renderMobileSidebarServers();
+},
+
+// ═══════════════════════════════════════════════════════
+// COLLAPSIBLE SIDEBAR SECTIONS (Join / Create)
+// ═══════════════════════════════════════════════════════
+
+_setupCollapsibleSections() {
+  const sections = [
+    { toggle: 'join-section-toggle', arrow: 'join-section-arrow', body: 'join-section-body', key: 'haven_join_collapsed' },
+    { toggle: 'create-section-toggle', arrow: 'create-section-arrow', body: 'create-section-body', key: 'haven_create_collapsed' },
+  ];
+  sections.forEach(({ toggle, arrow, body, key }) => {
+    const toggleEl = document.getElementById(toggle);
+    const arrowEl = document.getElementById(arrow);
+    const bodyEl = document.getElementById(body);
+    if (!toggleEl || !bodyEl) return;
+
+    // Restore saved state (default = expanded)
+    const saved = localStorage.getItem(key);
+    if (saved === '1') {
+      arrowEl?.classList.add('collapsed');
+      bodyEl.classList.add('collapsed');
+    }
+
+    toggleEl.addEventListener('click', () => {
+      const isCollapsed = bodyEl.classList.toggle('collapsed');
+      arrowEl?.classList.toggle('collapsed', isCollapsed);
+      localStorage.setItem(key, isCollapsed ? '1' : '0');
+    });
+  });
+},
+
+/* ── Polls ───────────────────────────────────────────── */
+
+_openPollModal() {
+  const modal = document.getElementById('poll-modal');
+  document.getElementById('poll-question-input').value = '';
+  document.getElementById('poll-multi-vote').checked = false;
+  document.getElementById('poll-anonymous').checked = false;
+  const list = document.getElementById('poll-options-list');
+  list.innerHTML = '';
+  for (let i = 0; i < 2; i++) {
+    this._addPollOptionRow(list, i);
+  }
+  modal.style.display = 'flex';
+  document.getElementById('poll-question-input').focus();
+},
+
+_addPollOptionRow(list, index) {
+  if (!list) list = document.getElementById('poll-options-list');
+  const row = document.createElement('div');
+  row.className = 'poll-option-row';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'poll-option-input';
+  input.placeholder = `Option ${index + 1}`;
+  input.maxLength = 100;
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'poll-option-remove';
+  removeBtn.textContent = '\u00d7';
+  removeBtn.title = t('modals.poll.remove_option');
+  removeBtn.style.display = list.children.length >= 2 ? '' : 'none';
+  removeBtn.addEventListener('click', () => {
+    row.remove();
+    this._updatePollRemoveButtons();
+  });
+  row.appendChild(input);
+  row.appendChild(removeBtn);
+  list.appendChild(row);
+  this._updatePollRemoveButtons();
+},
+
+_addPollOption() {
+  const list = document.getElementById('poll-options-list');
+  const maxOpts = parseInt(this.serverSettings?.max_poll_options) || 10;
+  if (list.children.length >= maxOpts) return;
+  this._addPollOptionRow(list, list.children.length);
+  const inputs = list.querySelectorAll('.poll-option-input');
+  inputs[inputs.length - 1].focus();
+},
+
+_updatePollRemoveButtons() {
+  const list = document.getElementById('poll-options-list');
+  const btns = list.querySelectorAll('.poll-option-remove');
+  btns.forEach(b => { b.style.display = list.children.length > 2 ? '' : 'none'; });
+},
+
+_submitPoll() {
+  const question = document.getElementById('poll-question-input').value.trim();
+  if (!question) return;
+  const inputs = document.querySelectorAll('#poll-options-list .poll-option-input');
+  const options = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+  if (options.length < 2) return;
+  const multiVote = document.getElementById('poll-multi-vote').checked;
+  const anonymous = document.getElementById('poll-anonymous').checked;
+
+  this.socket.emit('create-poll', { question, options, multiVote, anonymous });
+  document.getElementById('poll-modal').style.display = 'none';
+},
+
+/* ── iOS Keyboard Layout Fix ────────────────────────── */
+// iOS Safari (both standalone PWA and browser) doesn't always shrink the
+// viewport reliably when the virtual keyboard opens.  We use the
+// visualViewport API to detect the keyboard height and resize #app so
+// the message input stays visible above the keyboard.
+
+_setupIOSKeyboard() {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // ── Safe-area probing (all mobile, but especially iOS) ──
+  // env(safe-area-inset-*) sometimes returns 0 even on notched devices
+  // (e.g. certain iOS versions in browser vs PWA mode, or when CSS env()
+  //  isn't evaluated). We probe the actual value via a hidden element and
+  // set CSS custom properties with a minimum floor as fallback.
+  if (isIOS || /Android/.test(navigator.userAgent)) {
+    const isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+      document.body.classList.add(isIOS ? 'is-ios' : 'is-android');
+
+      // Detect standalone PWA mode
+      if (isIOS && (window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches)) {
+        document.body.classList.add('is-ios-pwa');
+      }
+
+      // Probe env(safe-area-inset-top) by measuring a hidden div
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;top:0;left:0;width:1px;pointer-events:none;visibility:hidden;'
+        + 'height:env(safe-area-inset-top,0px);height:constant(safe-area-inset-top)';
+      document.body.appendChild(probe);
+
+      requestAnimationFrame(() => {
+        const measuredTop = probe.offsetHeight;
+        probe.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;pointer-events:none;visibility:hidden;'
+          + 'height:env(safe-area-inset-bottom,0px);height:constant(safe-area-inset-bottom)';
+
+        requestAnimationFrame(() => {
+          const measuredBottom = probe.offsetHeight;
+          document.body.removeChild(probe);
+
+          // Determine minimum safe-area for this device
+          let minTop = 0, minBottom = 0;
+          if (isIOS) {
+            const h = window.screen.height;
+            // iPhone X+ / Dynamic Island (screen height >= 812pt)
+            if (h >= 812) { minTop = 47; minBottom = 34; }
+            // Older iPhones
+            else { minTop = 20; minBottom = 0; }
+          }
+
+          const safeTop = Math.max(measuredTop, minTop);
+          const safeBottom = Math.max(measuredBottom, minBottom);
+          const root = document.documentElement;
+          root.style.setProperty('--safe-top', safeTop + 'px');
+          root.style.setProperty('--safe-bottom', safeBottom + 'px');
+        });
+      });
+    }
+  }
+
+  if (!window.visualViewport || !isIOS) return;
+
+  const app = document.getElementById('app');
+  const messages = document.getElementById('messages');
+
+  const onViewportResize = () => {
+    const kbHeight = window.innerHeight - window.visualViewport.height;
+    // Only apply when keyboard is actually open (threshold avoids toolbar jitter)
+    if (kbHeight > 50) {
+      app.style.height = window.visualViewport.height + 'px';
+      document.body.classList.add('ios-keyboard-open');
+      // Scroll messages to bottom so user sees latest while typing
+      if (messages) requestAnimationFrame(() => messages.scrollTop = messages.scrollHeight);
+    } else {
+      app.style.height = '';
+      document.body.classList.remove('ios-keyboard-open');
+    }
+  };
+
+  window.visualViewport.addEventListener('resize', onViewportResize);
+  window.visualViewport.addEventListener('scroll', onViewportResize);
+},
+
+/* ── Mobile App Bridge (Capacitor shell ↔ MSG Arena) ───── */
+
+_setupMobileBridge() {
+  // Only activate when running inside the mobile app's iframe
+  this._isMobileApp = (window !== window.top);
+  if (!this._isMobileApp) return;
+
+  // Add a body class so CSS can adapt for mobile-app context
+  document.body.classList.add('haven-mobile-app');
+
+  // Listen for messages from the Capacitor shell
+  window.addEventListener('message', (e) => {
+    const data = e.data;
+    if (!data || typeof data.type !== 'string') return;
+
+    switch (data.type) {
+      case 'haven:back':
+        this._handleMobileBack();
+        break;
+
+      case 'haven:fcm-token':
+        // Receive FCM token from native layer → send to server
+        if (data.token && this.socket?.connected) {
+          this.socket.emit('register-fcm-token', { token: data.token });
+        }
+        this._fcmToken = data.token;
+        break;
+
+      case 'haven:mobile-init':
+        // Shell confirms we're in mobile app
+        this._mobilePlatform = data.platform || 'unknown';
+        break;
+
+      case 'haven:push-received':
+        // In-app push notification received while app is open
+        if (data.notification) {
+          const n = data.notification;
+          const title = n.title || 'MSG Arena';
+          const body = n.body || '';
+          this._showToast(`${title}: ${body}`, 'info');
+        }
+        break;
+
+      case 'haven:push-action':
+        // User tapped a push notification → switch to that channel
+        if (data.data?.channelCode) {
+          this.switchChannel(data.data.channelCode);
+        }
+        break;
+
+      case 'haven:resume':
+        // App returned to foreground — reconnect socket if needed
+        if (this.socket && !this.socket.connected) {
+          this.socket.connect();
+        }
+        break;
+
+      case 'haven:keyboard':
+        // Keyboard visibility changed
+        if (data.visible) {
+          document.body.classList.add('native-keyboard-open');
+        } else {
+          document.body.classList.remove('native-keyboard-open');
+        }
+        break;
+    }
+  });
+
+  // Notify the shell that MSG Arena is loaded and ready
+  this._postToShell({ type: 'haven:ready' });
+
+  // If user logs out, tell the shell
+  const origLogout = this._logout?.bind(this);
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      this._postToShell({ type: 'haven:disconnect' });
+    }, { capture: true });
+  }
+
+  // Send theme color to shell so status bar can match
+  this._reportThemeColor();
+
+  // Watch for theme changes and re-report
+  const themeObs = new MutationObserver(() => {
+    setTimeout(() => this._reportThemeColor(), 100);
+  });
+  themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+},
+
+_postToShell(msg) {
+  if (!this._isMobileApp) return;
+  try { window.parent.postMessage(msg, '*'); } catch (_) {}
+},
+
+_handleMobileBack() {
+  // Priority order: close the most "on-top" UI element first
+
+  // 1. Any open modal overlays
+  const openModals = document.querySelectorAll('.modal-overlay');
+  for (const m of openModals) {
+    if (m.style.display && m.style.display !== 'none') {
+      m.style.display = 'none';
+      return;
+    }
+  }
+
+  // 2. Search container / results
+  const search = document.getElementById('search-container');
+  if (search && search.style.display !== 'none' && search.style.display !== '') {
+    search.style.display = 'none';
+    document.getElementById('search-panel').style.display = 'none';
+    return;
+  }
+
+  // 3. Theme popup
+  const themePopup = document.getElementById('theme-popup');
+  if (themePopup && themePopup.style.display !== 'none' && themePopup.style.display !== '') {
+    themePopup.style.display = 'none';
+    return;
+  }
+
+  // 4. Voice settings panel
+  const voicePanel = document.getElementById('voice-settings-panel');
+  if (voicePanel && voicePanel.classList.contains('open')) {
+    voicePanel.classList.remove('open');
+    return;
+  }
+
+  // 5. Mobile sidebars (left or right)
+  const appBody = document.getElementById('app-body');
+  if (appBody.classList.contains('mobile-sidebar-open') || appBody.classList.contains('mobile-right-open')) {
+    this._closeMobilePanels();
+    return;
+  }
+
+  // 6. GIF picker
+  const gifPanel = document.getElementById('gif-panel');
+  if (gifPanel && gifPanel.style.display !== 'none' && gifPanel.style.display !== '') {
+    gifPanel.style.display = 'none';
+    return;
+  }
+
+  // 7. Emoji picker
+  const emojiPicker = document.querySelector('emoji-picker');
+  if (emojiPicker && emojiPicker.style.display !== 'none' && emojiPicker.style.display !== '') {
+    emojiPicker.style.display = 'none';
+    return;
+  }
+
+  // Nothing to close — tell shell
+  this._postToShell({ type: 'haven:back-exhausted' });
+},
+
+_reportThemeColor() {
+  if (!this._isMobileApp) return;
+  // Read the computed background of the top bar or body
+  const topBar = document.querySelector('.top-bar') || document.querySelector('.sidebar');
+  if (topBar) {
+    const bg = getComputedStyle(topBar).backgroundColor;
+    // Convert rgb(r,g,b) → hex
+    const match = bg.match(/(\d+)/g);
+    if (match && match.length >= 3) {
+      const hex = '#' + match.slice(0, 3).map(n => parseInt(n).toString(16).padStart(2, '0')).join('');
+      this._postToShell({ type: 'haven:theme-color', color: hex });
+    }
+  }
+},
+
+_saveRename() {
+  const input = document.getElementById('rename-input');
+  // Mirrors normalizeDisplayName on the server (#5509) so a name in any
+  // script gets an instant answer here rather than a bare error-msg back.
+  const newName = input.value.normalize('NFC').trim().replace(/\s+/g, ' ');
+  if (!newName || [...newName].length < 2) {
+    return this._showToast(t('toasts.display_name_too_short'), 'error');
+  }
+  if (!/^[\p{L}\p{N}\p{M}_ ]+$/u.test(newName)) {
+    return this._showToast(t('toasts.display_name_invalid_chars'), 'error');
+  }
+  if (/\p{M}{4,}/u.test(newName)) {
+    return this._showToast(t('toasts.display_name_too_many_marks'), 'error');
+  }
+  this.socket.emit('rename-user', { username: newName });
+  // Save bio
+  const bioInput = document.getElementById('edit-profile-bio');
+  if (bioInput) {
+    this.socket.emit('set-bio', { bio: bioInput.value });
+  }
+  // Also commit any pending avatar changes
+  this._commitAvatarSettings();
+  document.getElementById('rename-modal').style.display = 'none';
+},
+
+// ── Upload with progress bar ───────────────────────────
+// Every in-flight request is kept in _activeUploads so the bar's × can abort
+// them. The general file queue fires its uploads without awaiting, so there
+// can be several at once — hence a set, and hence hiding the bar only once
+// the last one settles rather than whenever any single one does.
+_uploadWithProgress(url, formData) {
+  return new Promise((resolve, reject) => {
+    const bar = document.getElementById('upload-progress-bar');
+    const fill = document.getElementById('upload-progress-fill');
+    const text = document.getElementById('upload-progress-text');
+    if (bar) { bar.style.display = 'flex'; }
+    if (fill) { fill.style.width = '0%'; }
+    if (text) { text.textContent = t('common.uploading'); }
+
+    if (!this._activeUploads) this._activeUploads = new Set();
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', `Bearer ${this.token}`);
+
+    const settle = () => {
+      this._activeUploads.delete(xhr);
+      if (bar && this._activeUploads.size === 0) bar.style.display = 'none';
+    };
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const pct = Math.round((e.loaded / e.total) * 100);
+        if (fill) fill.style.width = pct + '%';
+        if (text) text.textContent = `${pct}%`;
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      settle();
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch { reject(new Error('Invalid JSON response')); }
+      } else {
+        let errMsg = `Upload failed (${xhr.status})`;
+        try { const d = JSON.parse(xhr.responseText); errMsg = d.error || errMsg; } catch {}
+        reject(new Error(errMsg));
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      settle();
+      reject(new Error('Upload failed — check your connection'));
+    });
+
+    xhr.addEventListener('abort', () => {
+      settle();
+      // Flagged so the callers can skip their own "upload failed" toast —
+      // cancelling on purpose isn't an error, and the cancel already toasts.
+      const err = new Error('Upload cancelled');
+      err.aborted = true;
+      reject(err);
+    });
+
+    this._activeUploads.add(xhr);
+    xhr.send(formData);
+  });
+},
+
+// The × on the progress bar. Aborts everything currently in flight and tells
+// the queue loops to stop, since cancelling one file out of a batch and then
+// watching the rest go up anyway isn't what the button looks like it does.
+_cancelUploads() {
+  const active = this._activeUploads ? [...this._activeUploads] : [];
+  if (active.length === 0) return;
+  this._uploadsCancelled = true;
+  active.forEach(xhr => { try { xhr.abort(); } catch { /* already settled */ } });
+  this._showToast(t('toasts.upload_cancelled'), 'info');
+},
+
+// Intercept clicks on concealed media. Returns true when the click was
+// consumed (so the caller skips opening the lightbox):
+//  - a "hidden image" placeholder → reveal the image in place
+//  - an unrevealed spoiler image → reveal it (next click opens the lightbox)
+_maybeRevealConcealed(e) {
+  const ph = e.target.closest && e.target.closest('.hidden-image');
+  if (ph) { this._revealHiddenImage(ph); return true; }
+  const sp = e.target.closest && e.target.closest('.spoiler-media');
+  if (sp && !sp.classList.contains('revealed')) {
+    sp.classList.add('revealed');
+    return true;
+  }
+  // Spoilered link embed (the link was wrapped in ||spoiler||) → reveal the
+  // card in place; blurred children have pointer-events disabled, so the
+  // click lands on the card and this consumes it before the embed's own
+  // controls or link fire.
+  const lp = e.target.closest && e.target.closest('.link-preview.lp-spoiler');
+  if (lp && !lp.classList.contains('revealed')) {
+    lp.classList.add('revealed');
+    return true;
+  }
+  return false;
+},
+
+async _uploadImage(file, targetCode, bundled = false, personaPrefix = '', spoiler = false) {
+  if (!this.currentChannel && !targetCode) return;
+  // The queue stores the per-image spoiler choice on the File object itself.
+  if (!spoiler && file && file._spoiler) spoiler = true;
+  // Capture the target channel NOW (before any await) so a mid-upload channel
+  // switch doesn't send the image to the wrong channel.
+  const targetChannel = targetCode || this.currentChannel;
+  const _maxMb = parseInt(this.serverSettings?.max_upload_mb) || 25;
+  if (file.size > _maxMb * 1024 * 1024) {
+    return this._showToast(t('toasts.image_too_large', { max: _maxMb }), 'error');
+  }
+
+  // Detect E2E DM — encrypt file bytes before uploading
+  const ch = this.channels.find(c => c.code === targetChannel);
+  const isDm = ch && ch.is_dm && ch.dm_target;
+  let partner = isDm ? this._getE2EPartnerFor(targetChannel) : null;
+  if (isDm && !partner && this.e2e && this.e2e.ready) {
+    const jwk = await this.e2e.requestPartnerKey(this.socket, ch.dm_target.id);
+    if (jwk) { this._dmPublicKeys[ch.dm_target.id] = jwk; partner = this._getE2EPartnerFor(targetChannel); }
+  }
+
+  if (partner) {
+    // E2E path: encrypt file → upload as opaque blob → send encrypted text marker
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const encrypted = await this.e2e.encryptBytes(arrayBuffer, partner.userId, partner.publicKeyJwk);
+      const blob = new Blob([encrypted], { type: 'application/octet-stream' });
+      const formData = new FormData();
+      formData.append('scope', 'dm');
+      formData.append('file', blob, 'e2e-image.enc');
+      const data = await this._uploadWithProgress('/api/upload-file', formData);
+      const mime = file.type || 'image/png';
+      const marker = `${spoiler ? 'spoiler-img:' : ''}e2e-img:${mime}:${data.url}`;
+      const encryptedText = await this.e2e.encrypt(marker, partner.userId, partner.publicKeyJwk);
+      this.socket.emit('send-message', {
+        code: targetChannel,
+        content: encryptedText,
+        encrypted: true,
+        ...(bundled && { bundled: true })
+      });
+      this.notifications.play('sent');
+    } catch (err) {
+      if (err?.aborted) return;
+      console.error('[E2E] Image encryption failed:', err);
+      const detail = err?.message ? ` — ${err.message}` : '';
+      this._showToast(`${t('toasts.encrypted_image_failed')}${detail}`, 'error');
+    }
+    return;
+  }
+
+  try {
+    // SVG must use /api/upload-file (the raster-only /api/upload rejects it)
+    let data;
+    const uploadScope = isDm ? 'dm' : 'channel';
+    if (file.type === 'image/svg+xml') {
+      const fd = new FormData();
+      fd.append('scope', uploadScope);
+      fd.append('file', file);
+      data = await this._uploadWithProgress('/api/upload-file', fd);
+    } else {
+      const formData = new FormData();
+      formData.append('scope', uploadScope);
+      formData.append('image', file);
+      data = await this._uploadWithProgress('/api/upload', formData);
+    }
+
+    // Send the image URL as a message to the channel that was active at upload time.
+    // Prepend persona prefix if this image is bundled with a persona text message.
+    this.socket.emit('send-message', {
+      code: targetChannel,
+      content: personaPrefix + (spoiler ? 'spoiler-img:' : '') + data.url,
+      isImage: true,
+      ...(bundled && { bundled: true })
+    });
+    this.notifications.play('sent');
+  } catch (err) {
+    if (err?.aborted) return;
+    this._showToast(err.message || t('toasts.upload_failed'), 'error');
+  }
+},
+
+// ── Channel Media Gallery (#5350) ─────────────────────
+_renderThreadList(filter = '') {
+  const body = document.getElementById('threads-list-body');
+  const countEl = document.getElementById('threads-list-count');
+  if (!body) return;
+
+  const all = this._threadListData || [];
+  const needle = String(filter || '').trim().toLowerCase();
+  const rows = needle
+    ? all.filter(th =>
+        String(th.content || '').toLowerCase().includes(needle) ||
+        String(th.username || '').toLowerCase().includes(needle))
+    : all;
+
+  if (countEl) {
+    countEl.textContent = needle
+      ? `${rows.length} / ${all.length}`
+      : (all.length ? String(all.length) : '');
+  }
+
+  if (!rows.length) {
+    const key = all.length ? 'thread_list.no_matches' : 'thread_list.empty';
+    const fallback = all.length
+      ? 'No threads match that search'
+      : 'No threads in this channel yet';
+    body.innerHTML = `<div class="media-gallery-empty muted-text">${(window.t && t(key)) || fallback}</div>`;
+    return;
+  }
+
+  body.innerHTML = rows.map(th => {
+    const replies = Number(th.reply_count) || 0;
+    const label = replies === 1
+      ? ((window.t && t('thread_list.reply_one')) || '1 reply')
+      : ((window.t && t('thread_list.reply_other', { count: replies })) || `${replies} replies`);
+    // Strip attachment markdown so a thread started with a file reads as its
+    // filename rather than a wall of markup.
+    const preview = String(th.content || '')
+      .replace(/\[file:([^\]]+)\]\([^)]*\)/g, '$1')
+      .replace(/!\[[^\]]*\]\(([^)\s]+)\)/g, '$1')
+      .trim();
+    return `
+      <button class="thread-list-row" data-parent-id="${th.id}">
+        <span class="thread-list-row-top">
+          <span class="thread-list-author">${this._escapeHtml(th.username || '')}</span>
+          <span class="thread-list-replies">${this._escapeHtml(label)}</span>
+          <span class="thread-list-when">${this._escapeHtml(this._formatTime?.(th.last_reply_at) || '')}</span>
+        </span>
+        <span class="thread-list-preview">${this._escapeHtml(preview)}</span>
+      </button>`;
+  }).join('');
+},
+
+_renderMediaGallery(data) {
+  this._mediaGalleryData = data;
+  ['photos','videos','audios','files','links'].forEach(k => {
+    const el = document.getElementById(`media-count-${k}`);
+    if (el) el.textContent = String((data[k] || []).length);
+  });
+  // Reset selection whenever fresh data comes in so stale picks don't linger
+  this._mediaGallerySelected = new Map();
+  this._mediaGallerySelectMode = false;
+  this._refreshMediaGalleryToolbar();
+  this._renderMediaGalleryTab(this._mediaGalleryActiveTab || 'photos');
+},
+
+// Build a stable key for a gallery row so the same attachment shared
+// across multiple messages is treated as distinct (since each row is its
+// own delete target). message_id + url is unique enough.
+_mediaItemKey(it) {
+  return `${it.message_id}|${it.url}`;
+},
+
+// Format bytes for the file size column / sort options. Matches the
+// human-readable formatting used elsewhere for upload size hints.
+_formatMediaSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n <= 0) return '';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+},
+
+// Apply current sort to a tab's items without mutating the source array
+// (so switching sort orders doesn't permanently scramble the data).
+_sortMediaItems(items) {
+  const sort = this._mediaGallerySort || 'date-desc';
+  const arr = items.slice();
+  const cmpDate = (a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0);
+  const cmpSize = (a, b) => (a.size || 0) - (b.size || 0);
+  const cmpName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base', numeric: true });
+  switch (sort) {
+    case 'date-asc':  arr.sort(cmpDate); break;
+    case 'size-asc':  arr.sort(cmpSize); break;
+    case 'size-desc': arr.sort((a, b) => -cmpSize(a, b)); break;
+    case 'name-asc':  arr.sort(cmpName); break;
+    case 'name-desc': arr.sort((a, b) => -cmpName(a, b)); break;
+    case 'date-desc':
+    default:          arr.sort((a, b) => -cmpDate(a, b)); break;
+  }
+  return arr;
+},
+
+// Returns true if the current user can bulk-delete content in this
+// channel via the gallery (admins or anyone with delete_message; we
+// don't expose Select Mode for self-only deleters because the bulk
+// endpoint silently skips ones they can't touch — that's confusing).
+_canBulkDeleteMedia() {
+  if (!this.user) return false;
+  if (this.user.isAdmin) return true;
+  if (this._hasPerm && this._hasPerm('delete_message')) return true;
+  if (this._hasPerm && this._hasPerm('delete_lower_messages')) return true;
+  return false;
+},
+
+// Show/hide the Select + Delete bar and update the info text whenever
+// selection state changes.
+_refreshMediaGalleryToolbar() {
+  const actions = document.getElementById('media-gallery-actions');
+  const toggle  = document.getElementById('media-gallery-select-toggle');
+  const selAll  = document.getElementById('media-gallery-select-all');
+  const delBtn  = document.getElementById('media-gallery-delete');
+  const info    = document.getElementById('media-gallery-selection-info');
+  if (!actions || !toggle || !selAll || !delBtn || !info) return;
+  if (!this._canBulkDeleteMedia()) {
+    actions.style.display = 'none';
+    return;
+  }
+  actions.style.display = '';
+  const selectMode = !!this._mediaGallerySelectMode;
+  const count = this._mediaGallerySelected ? this._mediaGallerySelected.size : 0;
+  toggle.textContent = selectMode
+    ? ((window.t && t('media_gallery.cancel_select')) || 'Cancel')
+    : ((window.t && t('media_gallery.select')) || 'Select');
+  selAll.style.display = selectMode ? '' : 'none';
+  delBtn.style.display = selectMode ? '' : 'none';
+  delBtn.disabled = count === 0;
+  info.style.display = selectMode ? '' : 'none';
+  info.textContent = selectMode ? `${count} selected` : '';
+},
+
+_renderMediaGalleryTab(tab) {
+  const body = document.getElementById('media-gallery-body');
+  if (!body || !this._mediaGalleryData) return;
+  const rawItems = this._mediaGalleryData[tab] || [];
+  if (rawItems.length === 0) {
+    const labels = {
+      photos: 'No photos in this channel yet',
+      videos: 'No videos in this channel yet',
+      audios: 'No audio files in this channel yet',
+      files:  'No files in this channel yet',
+      links:  'No links in this channel yet',
+    };
+    body.innerHTML = `<div class="media-gallery-empty muted-text">${labels[tab] || 'Nothing here yet'}</div>`;
+    return;
+  }
+  const items = this._sortMediaItems(rawItems);
+
+  const fmt = (iso) => {
+    try {
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch { return ''; }
+  };
+  const esc = (s) => this._escapeHtml ? this._escapeHtml(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  // Links don't have a backing /uploads/ file we can delete from disk and
+  // sit inside whatever message they were posted in (often alongside
+  // unrelated text), so bulk-delete is intentionally disabled for them.
+  const selectMode = !!this._mediaGallerySelectMode && tab !== 'links';
+  const selected = this._mediaGallerySelected || new Map();
+  const selBox = (it) => {
+    if (!selectMode) return '';
+    const key = this._mediaItemKey(it);
+    const checked = selected.has(key) ? 'checked' : '';
+    return `<label class="media-select-box" data-msg-id="${it.message_id}" data-url="${esc(it.url)}"><input type="checkbox" ${checked}></label>`;
+  };
+  const sizeBadge = (it) => {
+    const s = this._formatMediaSize(it.size);
+    return s ? `<span class="media-size-badge">${esc(s)}</span>` : '';
+  };
+
+  if (tab === 'photos') {
+    body.innerHTML = `<div class="media-gallery-grid${selectMode ? ' select-mode' : ''}">${items.map(it => `
+      <div class="media-grid-item${selected.has(this._mediaItemKey(it)) ? ' selected' : ''}" data-url="${esc(it.url)}" data-msg-id="${it.message_id}" data-action="lightbox" title="${esc(it.username || '')} • ${esc(fmt(it.created_at))}">
+        ${selBox(it)}
+        <img src="${esc(it.url)}" loading="lazy" alt="">
+        <button class="media-grid-jump" data-action="jump" data-msg-id="${it.message_id}" title="Jump to message">↗</button>
+        <div class="media-grid-date">${esc(fmt(it.created_at))}${sizeBadge(it) ? ' • ' + sizeBadge(it) : ''}</div>
+      </div>`).join('')}</div>`;
+  } else if (tab === 'videos') {
+    body.innerHTML = `<div class="media-gallery-grid${selectMode ? ' select-mode' : ''}">${items.map(it => `
+      <div class="media-grid-item${selected.has(this._mediaItemKey(it)) ? ' selected' : ''}" data-url="${esc(it.url)}" data-msg-id="${it.message_id}" data-action="video-lightbox" title="${esc(it.username || '')} • ${esc(fmt(it.created_at))}">
+        ${selBox(it)}
+        <video src="${esc(it.url)}" preload="metadata" muted></video>
+        <div class="media-grid-play">▶</div>
+        <button class="media-grid-jump" data-action="jump" data-msg-id="${it.message_id}" title="Jump to message">↗</button>
+        <div class="media-grid-date">${esc(fmt(it.created_at))}${sizeBadge(it) ? ' • ' + sizeBadge(it) : ''}</div>
+      </div>`).join('')}</div>`;
+  } else if (tab === 'audios') {
+    body.innerHTML = `<div class="media-list${selectMode ? ' select-mode' : ''}">${items.map(it => `
+      <div class="media-list-item${selected.has(this._mediaItemKey(it)) ? ' selected' : ''}" data-msg-id="${it.message_id}" data-url="${esc(it.url)}">
+        ${selBox(it)}
+        <div class="media-list-icon">🎵</div>
+        <div class="media-list-info">
+          <span class="media-list-name">${esc(it.name || it.url.split('/').pop())} ${sizeBadge(it)}</span>
+          <span class="media-list-meta">${esc(it.username || '')} • ${esc(fmt(it.created_at))}</span>
+          <audio class="media-list-audio" src="${esc(it.url)}" controls preload="none"></audio>
+        </div>
+        <button class="media-list-jump" data-action="jump" data-msg-id="${it.message_id}" title="Jump to message">↗</button>
+      </div>`).join('')}</div>`;
+  } else if (tab === 'files') {
+    // In select mode, render as <div> instead of <a> so clicking the row
+    // toggles selection instead of triggering the download.
+    body.innerHTML = `<div class="media-list${selectMode ? ' select-mode' : ''}">${items.map(it => {
+      const isSel = selected.has(this._mediaItemKey(it));
+      const tag = selectMode ? 'div' : 'a';
+      const linkAttrs = selectMode ? '' : ` href="${esc(it.url)}" download target="_blank" rel="noopener"`;
+      return `
+      <${tag} class="media-list-item${isSel ? ' selected' : ''}" data-msg-id="${it.message_id}" data-url="${esc(it.url)}"${linkAttrs}>
+        ${selBox(it)}
+        <div class="media-list-icon">📄</div>
+        <div class="media-list-info">
+          <span class="media-list-name">${esc(it.name || it.url.split('/').pop())} ${sizeBadge(it)}</span>
+          <span class="media-list-meta">${esc(it.username || '')} • ${esc(fmt(it.created_at))}</span>
+        </div>
+        <button class="media-list-jump" data-action="jump" data-msg-id="${it.message_id}" title="Jump to message">↗</button>
+      </${tag}>`;
+    }).join('')}</div>`;
+  } else if (tab === 'links') {
+    body.innerHTML = `<div class="media-list">${items.map(it => {
+      let host = '';
+      try { host = new URL(it.url).hostname; } catch {}
+      return `
+      <a class="media-list-item" href="${esc(it.url)}" target="_blank" rel="noopener noreferrer nofollow">
+        <div class="media-list-icon">🔗</div>
+        <div class="media-list-info">
+          <span class="media-list-name">${esc(host || it.url)}</span>
+          <span class="media-list-meta">${esc(it.url)}</span>
+          <span class="media-list-meta">${esc(it.username || '')} • ${esc(fmt(it.created_at))}</span>
+        </div>
+        <button class="media-list-jump" data-action="jump" data-msg-id="${it.message_id}" title="Jump to message">↗</button>
+      </a>`;
+    }).join('')}</div>`;
+  }
+
+  // Selection checkbox + row-click toggling (only active when in select
+  // mode). We let users click anywhere on the tile/row to toggle, but
+  // suppress the lightbox/download/jump actions during selection.
+  if (selectMode) {
+    body.querySelectorAll('.media-select-box').forEach(box => {
+      box.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      const cb = box.querySelector('input[type="checkbox"]');
+      if (cb) cb.addEventListener('change', () => {
+        const msgId = parseInt(box.dataset.msgId);
+        const url = box.dataset.url;
+        const key = `${msgId}|${url}`;
+        if (cb.checked) this._mediaGallerySelected.set(key, { message_id: msgId, url });
+        else this._mediaGallerySelected.delete(key);
+        const item = box.closest('.media-grid-item, .media-list-item');
+        if (item) item.classList.toggle('selected', cb.checked);
+        this._refreshMediaGalleryToolbar();
+      });
+    });
+    body.querySelectorAll('.media-grid-item, .media-list-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        // Only react to bare row clicks, not clicks on the checkbox label
+        // itself (handled above) or on inner controls.
+        if (e.target.closest('.media-select-box') || e.target.closest('[data-action="jump"]') ||
+            e.target.tagName === 'AUDIO' || e.target.tagName === 'VIDEO' || e.target.tagName === 'INPUT') return;
+        const cb = el.querySelector('.media-select-box input[type="checkbox"]');
+        if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
+        e.preventDefault();
+        e.stopPropagation();
+      }, true);
+    });
+  } else {
+    // Normal click behavior (lightbox, video preview, jump-to-message)
+    body.querySelectorAll('[data-action="lightbox"]').forEach(el => {
+      el.addEventListener('click', () => {
+        const url = el.dataset.url;
+        if (url && this._openLightbox) this._openLightbox(url);
+      });
+    });
+    body.querySelectorAll('[data-action="video-lightbox"]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        // Avoid triggering when the user clicks the inner jump button
+        if (e.target.closest('[data-action="jump"]')) return;
+        const url = el.dataset.url;
+        if (url) this._openVideoLightbox(url);
+      });
+    });
+  }
+  body.querySelectorAll('[data-action="jump"]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = parseInt(el.dataset.msgId);
+      if (!id) return;
+      document.getElementById('media-gallery-modal').style.display = 'none';
+      if (this._jumpToMessage) this._jumpToMessage(id);
+    });
+  });
+},
+
+// Lightbox-style overlay that plays a video (used by the media gallery
+// videos tab). Mirrors the image lightbox structure so it sits above any
+// modal overlays via the same z-index strategy.
+_openVideoLightbox(src) {
+  // Tear down any existing
+  const old = document.getElementById('video-lightbox');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'video-lightbox';
+  overlay.className = 'image-lightbox';
+  overlay.innerHTML = `
+    <video class="lightbox-video" src="${this._escapeHtml(src)}" controls autoplay playsinline></video>
+  `;
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      const v = overlay.querySelector('video');
+      if (v) { try { v.pause(); } catch {} }
+      overlay.remove();
+    }
+  });
+  const closeOnEsc = (e) => {
+    if (e.key === 'Escape') {
+      const v = overlay.querySelector('video');
+      if (v) { try { v.pause(); } catch {} }
+      overlay.remove();
+      document.removeEventListener('keydown', closeOnEsc);
+    }
+  };
+  document.addEventListener('keydown', closeOnEsc);
+  document.body.appendChild(overlay);
+},
+
+// ── Personas (#86, #5349) ──────────────────────────────
+
+// Persona prefix autocomplete: when the input STARTS with "::" we suggest
+// the user's own personas. Using "::" as a deliberate, unambiguous trigger
+// that doesn't conflict with any markdown syntax (">>" would render as a
+// nested blockquote if the persona lookup fails). The persona owner can
+// type their persona's name normally in chat without accidentally routing
+// the message through the persona.
+_checkPersonaTrigger(inputEl) {
+  // Personas are not supported in DMs — suppress the dropdown if the current
+  // channel is a DM (covers fullscreen DM view which reuses #message-input).
+  const _curCh = this.currentChannel && this.channels && this.channels.find(c => c.code === this.currentChannel);
+  if (_curCh && _curCh.is_dm) { this._hidePersonaDropdown(); return; }
+  const input = inputEl || document.getElementById('message-input');
+  if (!input) return;
+  this._personaInput = input;
+  const text = input.value;
+  const m = text.match(/^::\s*([^\s:]{0,32})$/);
+  if (m) {
+    this._personaTriggerQuery = m[1].toLowerCase();
+    // Lazy load personas the first time the user reaches for them
+    if (!this._personas && !this._personasLoading) {
+      this._personasLoading = true;
+      this._loadPersonas?.().finally(() => {
+        this._personasLoading = false;
+        this._showPersonaDropdown();
+      });
+    }
+    this._showPersonaDropdown();
+  } else {
+    this._hidePersonaDropdown();
+  }
+},
+
+_showPersonaDropdown() {
+  const dropdown = document.getElementById('persona-dropdown');
+  if (!dropdown) return;
+  const host = (this._personaInput && this._personaInput.parentElement) || null;
+  if (host && dropdown.parentElement !== host) host.appendChild(dropdown);
+  const personas = (this._personas || []).slice();
+  const q = this._personaTriggerQuery || '';
+  const filtered = personas.filter(p => (p.name || '').toLowerCase().startsWith(q)).slice(0, 8);
+  if (filtered.length === 0) {
+    if (q.length === 0 && personas.length === 0) {
+      // No personas yet — point the user at the profile UI
+      dropdown.innerHTML = `<div class="mention-item" data-persona-empty="1"><strong>No personas yet</strong> <span class="mention-item-handle">create one in Profile → Personas</span></div>`;
+      dropdown.style.display = 'block';
+      dropdown.querySelectorAll('[data-persona-empty]').forEach(el => {
+        el.addEventListener('click', () => {
+          this._hidePersonaDropdown();
+          document.getElementById('rename-btn')?.click();
+        });
+      });
+      return;
+    }
+    dropdown.style.display = 'none';
+    return;
+  }
+  const esc = (s) => this._escapeHtml(s);
+  dropdown.innerHTML = filtered.map((p, i) => {
+    const avatar = p.avatar
+      ? `<img src="${esc(p.avatar)}" class="persona-dd-avatar" alt="">`
+      : `<span class="persona-dd-avatar persona-dd-avatar-fallback">${esc((p.name || '?').charAt(0).toUpperCase())}</span>`;
+    return `<div class="mention-item${i === 0 ? ' active' : ''}" data-persona-name="${esc(p.name)}">${avatar}<strong>${esc(p.name)}</strong> <span class="mention-item-handle">::${esc(p.name)} message</span></div>`;
+  }).join('');
+  dropdown.style.display = 'block';
+  dropdown.querySelectorAll('[data-persona-name]').forEach(item => {
+    item.addEventListener('click', () => this._insertPersona(item.dataset.personaName));
+  });
+},
+
+_hidePersonaDropdown() {
+  const dropdown = document.getElementById('persona-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  this._personaTriggerQuery = '';
+},
+
+_navigatePersonaDropdown(direction) {
+  const dropdown = document.getElementById('persona-dropdown');
+  if (!dropdown) return;
+  const items = dropdown.querySelectorAll('.mention-item');
+  if (items.length === 0) return;
+  let activeIdx = -1;
+  items.forEach((item, i) => { if (item.classList.contains('active')) activeIdx = i; });
+  items.forEach(item => item.classList.remove('active'));
+  let next = activeIdx + direction;
+  if (next < 0) next = items.length - 1;
+  if (next >= items.length) next = 0;
+  items[next].classList.add('active');
+  items[next].scrollIntoView({ block: 'nearest' });
+},
+
+_insertPersona(name) {
+  const input = this._personaInput || document.getElementById('message-input');
+  if (!input) return;
+  // Replace any leading ::partial with ::FullName + space, then position
+  // cursor after, so the user can immediately type their message body.
+  const text = input.value;
+  const rest = text.replace(/^::\s*[^\s:]{0,32}/, '');
+  input.value = `::${name} ` + rest.replace(/^\s+/, '');
+  const caret = ('::' + name + ' ').length;
+  input.selectionStart = input.selectionEnd = caret;
+  input.focus();
+  this._hidePersonaDropdown();
+},
+
+async _loadPersonas() {
+  try {
+    const res = await fetch('/api/personas', {
+      headers: { 'Authorization': `Bearer ${this.token}` }
+    });
+    if (!res.ok) throw new Error('Failed to load personas');
+    const data = await res.json();
+    this._personas = data.personas || [];
+    this._renderPersonasList();
+  } catch (err) {
+    console.error('Load personas error:', err);
+  }
+},
+
+_renderPersonasList() {
+  const list = document.getElementById('personas-list');
+  if (!list) return;
+  const personas = this._personas || [];
+  const esc = (s) => this._escapeHtml ? this._escapeHtml(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if (personas.length === 0) {
+    list.innerHTML = `<p class="muted-text" style="font-size:.78rem;margin:6px 0">No personas yet. Click "+ Add Persona" to create one.</p>`;
+    return;
+  }
+  list.innerHTML = personas.map(p => `
+    <div class="persona-item" data-persona-id="${p.id}">
+      <div class="persona-item-avatar">${p.avatar
+          ? `<img src="${esc(p.avatar)}" alt="">`
+          : esc((p.name || '?').charAt(0).toUpperCase())}</div>
+      <div class="persona-item-info">
+        <div class="persona-item-name">${esc(p.name)}</div>
+        <div class="persona-item-trigger">${esc(p.name)}: your message</div>
+      </div>
+      <div class="persona-item-actions">
+        <button class="persona-edit-btn" data-id="${p.id}" title="Edit">✎</button>
+        <button class="persona-delete-btn" data-id="${p.id}" title="Delete">🗑</button>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.persona-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => this._showPersonaEditor(parseInt(btn.dataset.id)));
+  });
+  list.querySelectorAll('.persona-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = parseInt(btn.dataset.id);
+      const persona = (this._personas || []).find(p => p.id === id);
+      if (!persona) return;
+      if (!confirm(`Delete persona "${persona.name}"? Past messages stay attributed to it.`)) return;
+      try {
+        const res = await fetch(`/api/personas/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${this.token}` }
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to delete');
+        this._personas = (this._personas || []).filter(p => p.id !== id);
+        this._renderPersonasList();
+      } catch (err) {
+        this._showToast?.(err.message || 'Delete failed', 'error');
+      }
+    });
+  });
+},
+
+_showPersonaEditor(id) {
+  const list = document.getElementById('personas-list');
+  if (!list) return;
+  const existing = id ? (this._personas || []).find(p => p.id === id) : null;
+  // If editor already open, close it first
+  const existingEditor = list.querySelector('.persona-edit-row');
+  if (existingEditor) existingEditor.remove();
+
+  const editor = document.createElement('div');
+  editor.className = 'persona-edit-row';
+  const esc = (s) => this._escapeHtml ? this._escapeHtml(s) : String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  editor.innerHTML = `
+    <div class="persona-edit-controls">
+      <div class="persona-item-avatar" id="persona-edit-avatar-preview">${existing && existing.avatar
+          ? `<img src="${esc(existing.avatar)}" alt="">`
+          : '?'}</div>
+      <input type="text" id="persona-edit-name" maxlength="32" placeholder="Persona name" value="${existing ? esc(existing.name) : ''}">
+      <button type="button" class="btn-sm" id="persona-edit-upload">Upload Avatar</button>
+      <input type="file" id="persona-edit-file" accept="image/jpeg,image/png,image/gif,image/webp" style="display:none">
+    </div>
+    <div class="persona-edit-controls" style="justify-content:flex-end">
+      <button type="button" class="btn-sm" id="persona-edit-cancel">Cancel</button>
+      <button type="button" class="btn-sm btn-accent" id="persona-edit-save">${existing ? 'Save' : 'Create'}</button>
+    </div>
+  `;
+  if (existing) {
+    const itemEl = list.querySelector(`.persona-item[data-persona-id="${id}"]`);
+    if (itemEl) itemEl.after(editor); else list.prepend(editor);
+  } else {
+    list.prepend(editor);
+  }
+
+  let pendingAvatarUrl = existing ? existing.avatar : null;
+  const fileInput = editor.querySelector('#persona-edit-file');
+  editor.querySelector('#persona-edit-upload').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      this._showToast?.('Avatar must be under 2 MB', 'error');
+      return;
+    }
+    const fd = new FormData();
+    fd.append('avatar', file);
+    try {
+      const res = await fetch('/api/upload-persona-avatar', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.token}` },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      pendingAvatarUrl = data.url;
+      const preview = editor.querySelector('#persona-edit-avatar-preview');
+      preview.innerHTML = `<img src="${esc(data.url)}" alt="">`;
+    } catch (err) {
+      this._showToast?.(err.message || 'Upload failed', 'error');
+    }
+  });
+
+  editor.querySelector('#persona-edit-cancel').addEventListener('click', () => editor.remove());
+  editor.querySelector('#persona-edit-name').focus();
+  editor.querySelector('#persona-edit-save').addEventListener('click', async () => {
+    const name = editor.querySelector('#persona-edit-name').value.trim();
+    if (!name) {
+      this._showToast?.('Name is required', 'error');
+      return;
+    }
+    try {
+      const url = existing ? `/api/personas/${existing.id}` : '/api/personas';
+      const method = existing ? 'PATCH' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+        body: JSON.stringify({ name, avatar: pendingAvatarUrl })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed');
+      // Update local list
+      if (existing) {
+        const idx = this._personas.findIndex(p => p.id === existing.id);
+        if (idx >= 0) this._personas[idx] = data.persona;
+      } else {
+        this._personas = [...(this._personas || []), data.persona].sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+      }
+      editor.remove();
+      this._renderPersonasList();
+    } catch (err) {
+      this._showToast?.(err.message || 'Save failed', 'error');
+    }
+  });
+},
+
+};

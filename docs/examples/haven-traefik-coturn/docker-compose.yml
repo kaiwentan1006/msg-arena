@@ -1,0 +1,79 @@
+# ── MSG Arena + Traefik + TURN ───────────────────────────────
+# Quick start:  docker compose up -d
+# Stop:         docker compose down
+# Logs:         docker compose logs -f
+#
+# Before first run:  docker network create proxy
+# ─────────────────────────────────────────────────────────
+
+services:
+  traefik:
+    image: ghcr.io/traefik/traefik:3
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entryPoints.web.address=:80
+      - --entryPoints.web.http.redirections.entryPoint.to=websecure
+      - --entryPoints.web.http.redirections.entryPoint.scheme=https
+      - --entryPoints.websecure.address=:443
+      - --serversTransport.insecureSkipVerify=true
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_certs:/letsencrypt
+    networks:
+      - proxy
+
+  haven:
+    image: ghcr.io/ancsemi/haven:latest
+    container_name: haven
+    restart: unless-stopped
+    volumes:
+      - haven_data:/data
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - SERVER_NAME=${SERVER_NAME}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - TURN_URL=turn:${DOMAIN}:3478
+      - TURN_SECRET=${TURN_SECRET}
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.haven.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.haven.entrypoints=websecure
+      - traefik.http.routers.haven.tls.certresolver=letsencrypt
+      - traefik.http.services.haven.loadbalancer.server.port=3000
+      - traefik.http.services.haven.loadbalancer.server.scheme=https
+      - traefik.http.routers.haven.service=haven
+
+  coturn:
+    image: ghcr.io/coturn/coturn:4.9
+    container_name: coturn
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -n
+      - --listening-port=3478
+      - --tls-listening-port=5349
+      - --realm=${DOMAIN}
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET}
+      - --min-port=49152
+      - --max-port=65535
+
+volumes:
+  haven_data:
+  traefik_certs:
+
+networks:
+  proxy:

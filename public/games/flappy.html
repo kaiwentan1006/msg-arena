@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shippy Container — MSG Arena</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/games/flappy.js"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg-primary, #0d1117);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      height: 100dvh;
+      font-family: var(--font-body, 'Segoe UI', sans-serif);
+      color: var(--text-primary, #e6e6e6);
+      padding: 10px;
+      box-sizing: border-box;
+    }
+    .game-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+    .game-header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--accent, #7c5cfc);
+    }
+    .game-header .back-btn {
+      padding: 6px 14px;
+      border-radius: 6px;
+      background: var(--bg-hover, #1e2a3a);
+      color: var(--text-secondary, #8b949e);
+      border: 1px solid var(--border, #30363d);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .game-header .back-btn:hover {
+      background: var(--accent, #7c5cfc);
+      color: #fff;
+    }
+    canvas {
+      border: 2px solid var(--border, #30363d);
+      border-radius: 8px;
+      background: #0a1628;
+      display: block;
+      cursor: pointer;
+      max-width: 100%;
+      max-height: calc(100vh - 180px);
+      max-height: calc(100dvh - 180px);
+    }
+    .score-bar {
+      display: flex;
+      gap: 24px;
+      margin-top: 10px;
+      font-size: 15px;
+      color: var(--text-secondary, #8b949e);
+      flex-shrink: 0;
+    }
+    .score-bar span { font-weight: 600; color: var(--accent, #7c5cfc); }
+    .instructions {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-muted, #484f58);
+      flex-shrink: 0;
+    }
+    .plot-bar {
+      margin-top: 14px;
+      max-width: 480px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-secondary, #8b949e);
+      padding: 8px 16px;
+      border: 1px solid var(--border, #30363d);
+      border-radius: 8px;
+      background: var(--bg-hover, rgba(30,42,58,0.5));
+      flex-shrink: 0;
+    }
+    .plot-bar strong {
+      color: var(--accent, #7c5cfc);
+    }
+    /* ── Leaderboard Panel ─────────────────────── */
+    .game-wrapper {
+      display: flex;
+      flex-direction: row;
+      gap: 10px;
+      align-items: flex-start;
+      flex: 1;
+      min-height: 0;
+    }
+    .game-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 0;
+      flex: 1;
+    }
+    .leaderboard-panel {
+      width: 200px;
+      max-height: 640px;
+      overflow-y: auto;
+      background: var(--bg-secondary, #161b22);
+      border: 1px solid var(--border, #30363d);
+      border-radius: 8px;
+      padding: 8px;
+      flex-shrink: 0;
+    }
+    /* Mobile leaderboard toggle button */
+    .lb-toggle-btn {
+      display: none;
+      position: fixed;
+      bottom: 14px;
+      right: 14px;
+      z-index: 1001;
+      background: var(--accent, #7c5cfc);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 20px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      line-height: 1;
+    }
+    .lb-toggle-btn:hover { filter: brightness(1.15); }
+    /* Mobile leaderboard overlay backdrop */
+    .lb-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 999;
+    }
+    @media (max-width: 730px) {
+      .game-wrapper {
+        flex-direction: column;
+        align-items: center;
+      }
+      .game-header h1 { font-size: 20px; }
+      .game-header { gap: 10px; }
+      /* Leaderboard becomes a slide-out sidebar on mobile */
+      .leaderboard-panel {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 220px;
+        max-width: 70vw;
+        max-height: none;
+        border-radius: 8px 0 0 8px;
+        z-index: 1000;
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+        box-shadow: -4px 0 16px rgba(0,0,0,0.5);
+      }
+      .leaderboard-panel.lb-open {
+        transform: translateX(0);
+      }
+      .lb-toggle-btn { display: flex; }
+      .lb-backdrop.lb-open { display: block; }
+    }
+    @media (max-width: 480px) {
+      body { padding: 6px; }
+      .game-header h1 { font-size: 16px; letter-spacing: 1px; }
+      .game-header .back-btn { padding: 4px 10px; font-size: 11px; }
+      .score-bar { font-size: 13px; gap: 12px; }
+      .plot-bar { display: none; }
+      canvas {
+        max-height: calc(100vh - 120px);
+        max-height: calc(100dvh - 120px);
+      }
+    }
+    .leaderboard-panel h3 {
+      font-size: 13px;
+      text-align: center;
+      margin-bottom: 6px;
+      color: var(--accent, #7c5cfc);
+      font-weight: 700;
+    }
+    .lb-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 4px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .lb-row:nth-child(odd) { background: var(--bg-primary, #0d1117); }
+    .lb-rank { width: 22px; text-align: center; font-weight: 700; color: var(--accent, #7c5cfc); flex-shrink: 0; }
+    .lb-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary, #e6e6e6); }
+    .lb-score { font-weight: 700; color: var(--accent, #7c5cfc); font-family: monospace; }
+  </style>
+</head>
+<body>
+  <button class="lb-toggle-btn" id="lb-toggle-btn" title="Leaderboard">🏆</button>
+  <div class="lb-backdrop" id="lb-backdrop"></div>
+  <div class="game-header">
+    <button class="back-btn" id="back-btn">← Back to MSG Arena</button>
+    <h1>🚢 Shippy Container</h1>
+  </div>
+  <div class="game-wrapper">
+    <div class="game-left">
+      <canvas id="game" width="480" height="640"></canvas>
+      <div class="score-bar">
+        Score: <span id="score-display">0</span>
+        &nbsp;|&nbsp;
+        Best: <span id="best-display">0</span>
+      </div>
+      <div class="instructions">Click, tap, or press Space / ↑ to jump</div>
+      <div class="plot-bar">
+        <strong>🚢</strong> Drew's shipment got hung up. Help him find his casual clothes from Albany.
+      </div>
+    </div>
+    <div class="leaderboard-panel" id="leaderboard-panel">
+      <h3>🏆 Leaderboard</h3>
+      <div id="leaderboard-list"><p style="font-size:11px;color:var(--text-muted)">Loading…</p></div>
+    </div>
+  </div>
+</body>
+</html>

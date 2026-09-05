@@ -1,0 +1,8 @@
+node_modules/
+functions/node_modules/
+*.json.bak
+
+# NEVER commit service account keys
+*service-account*.json
+*adminsdk*.json
+*firebase-admin*.json
