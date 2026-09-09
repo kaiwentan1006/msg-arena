@@ -1,0 +1,13 @@
+{
+  "name": "haven-push-relay",
+  "version": "1.0.0",
+  "description": "FCM push relay for Haven mobile apps",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "firebase-admin": "^13.0.0"
+  }
+}

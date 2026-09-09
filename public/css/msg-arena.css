@@ -1,0 +1,1914 @@
+/* ══════════════════════════════════════════════════════════════════════
+   MSG ARENA — design layer
+   ----------------------------------------------------------------------
+   A cohesive modern skin loaded AFTER style.css. It transforms the LOOK
+   (typography, depth, surfaces, accents, motion) without touching the DOM
+   or layout, so every feature keeps working. Rules use theme tokens, so
+   the 26 built-in themes keep their own palettes; this only re-skins the
+   shared component surfaces and the default MSG Arena identity.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Typeface: Inter for UI, Space Grotesk for the wordmark/headings ── */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/inter-400.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/inter-500.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/inter-600.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/inter-700.woff2') format('woff2'); }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/spacegrotesk-500.woff2') format('woff2'); }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 600; font-display: swap; src: url('/fonts/spacegrotesk-600.woff2') format('woff2'); }
+@font-face { font-family: 'Space Grotesk'; font-style: normal; font-weight: 700; font-display: swap; src: url('/fonts/spacegrotesk-700.woff2') format('woff2'); }
+
+/* ── Design variables (applied over every theme) ─────────────────────
+   Only cosmetic scale/typography here; the per-theme colour tokens are
+   left to the theme. --font-* is deliberately NOT overridden for themes
+   whose identity IS a font (crt/win95/matrix), see the guard below. */
+:root {
+  --font-main:    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --ma-display:   'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --radius:       12px;
+  --radius-sm:    8px;
+  --ma-radius-lg: 18px;
+  --ma-radius-pill: 999px;
+  --transition:   0.16s cubic-bezier(.4, 0, .2, 1);
+  --ma-shadow-sm: 0 1px 2px rgba(0,0,0,.28);
+  --ma-shadow:    0 6px 20px -6px rgba(0,0,0,.45), 0 2px 6px rgba(0,0,0,.30);
+  --ma-shadow-lg: 0 24px 60px -12px rgba(0,0,0,.60), 0 8px 24px rgba(0,0,0,.35);
+  --ma-ring:      0 0 0 3px var(--accent-glow);
+  --ma-surface:   color-mix(in srgb, var(--bg-secondary) 82%, transparent);
+}
+/* Themes whose whole personality is their typeface keep it. */
+[data-theme="crt"], [data-theme="win95"], [data-theme="matrix"], [data-theme="fallout"] {
+  --font-main: revert;
+  --font-heading: revert;
+}
+
+/* ── Base ────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-main);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.1px;
+}
+h1, h2, h3, h4, .settings-title, .modal h3 { font-family: var(--font-heading); letter-spacing: -0.2px; }
+
+/* App backdrop: a soft depth gradient instead of a flat fill. */
+#app-body, [data-haven-region="workspace"], [data-haven-region="app-shell"] {
+  background:
+    radial-gradient(1200px 600px at 12% -8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 60%),
+    radial-gradient(1000px 700px at 108% 0%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 55%),
+    var(--bg-primary);
+}
+
+/* ── Custom scrollbars: thin, quiet, accent on hover ─────────────── */
+* { scrollbar-width: thin; scrollbar-color: var(--border-light) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); background-clip: padding-box; }
+
+/* ── Panels: sidebar / member list / channel header ──────────────── */
+.sidebar,
+[data-haven-region="navigation-sidebar"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 96%, var(--accent) 4%), var(--bg-secondary));
+  border-right: 1px solid var(--border);
+}
+.right-sidebar, [data-haven-region="member-list"], [data-haven-region="context-sidebar"] {
+  background: linear-gradient(180deg, var(--bg-secondary), color-mix(in srgb, var(--bg-secondary) 94%, #000 6%));
+  border-left: 1px solid var(--border);
+}
+.channel-header, [data-haven-region="channel-header"] {
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  backdrop-filter: saturate(1.2) blur(8px);
+  -webkit-backdrop-filter: saturate(1.2) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Brand wordmark ──────────────────────────────────────────────── */
+.brand-text, .auth-header h1 {
+  font-family: var(--ma-display);
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  background: linear-gradient(92deg, var(--accent-hover), var(--accent));
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.logo-sm, .auth-header .logo { filter: drop-shadow(0 0 10px var(--accent-glow)); }
+
+/* ── Channel list items ──────────────────────────────────────────── */
+.channel-item {
+  border-radius: var(--radius-sm);
+  transition: background var(--transition), color var(--transition), transform var(--transition);
+  position: relative;
+}
+.channel-item:hover { background: var(--bg-hover); }
+.channel-item.active, .channel-item.selected {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-active));
+  color: var(--text-primary);
+}
+.channel-item.active::before, .channel-item.selected::before {
+  content: ''; position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 60%; border-radius: 3px; background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+.btn, .btn-sm, button.btn, .settings-btn {
+  border-radius: var(--radius-sm);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition);
+}
+.btn:active, .btn-sm:active, .btn-accent:active, .btn-send:active { transform: translateY(1px); }
+.btn-accent, .btn-send, .thread-send-btn, .btn-admin-save {
+  background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+  color: var(--accent-text);
+  border: none;
+  box-shadow: 0 2px 10px -2px var(--accent-glow);
+}
+.btn-accent:hover, .btn-send:hover, .thread-send-btn:hover, .btn-admin-save:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px -4px var(--accent-glow);
+  filter: brightness(1.04);
+}
+.btn-danger { transition: transform var(--transition), filter var(--transition); }
+.btn-danger:hover { filter: brightness(1.06); transform: translateY(-1px); }
+
+/* ── Inputs + composer ───────────────────────────────────────────── */
+input[type="text"], input[type="password"], input[type="search"], input[type="number"],
+textarea, select, .message-input, .lfg-input, .gameid-input, .connection-username-input {
+  border-radius: var(--radius-sm);
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+input:focus, textarea:focus, select:focus,
+.message-input:focus, .lfg-input:focus, .gameid-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--ma-ring);
+}
+.message-input-container, .composer, [data-haven-region="composer"] {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.message-input-container:focus-within { border-color: var(--accent); box-shadow: var(--ma-ring); }
+
+/* ── Messages ────────────────────────────────────────────────────── */
+.message-row { transition: background var(--transition); border-radius: 6px; }
+.message-row:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.message .username, .message-row .username, .msg-author { font-weight: 600; }
+
+/* ── Modals: glass + elevation ───────────────────────────────────── */
+.modal-overlay { background: rgba(4, 7, 14, 0.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.modal {
+  border-radius: var(--ma-radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--ma-shadow-lg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 96%, var(--accent) 4%), var(--bg-secondary));
+}
+
+/* ── Avatars: subtle ring ────────────────────────────────────────── */
+.user-item .avatar, .message .avatar, .msg-avatar { transition: transform var(--transition); }
+.user-item:hover .avatar { transform: scale(1.06); }
+
+/* ── Member-list rows + group labels ─────────────────────────────── */
+.user-item { border-radius: var(--radius-sm); transition: background var(--transition); }
+.user-item:hover { background: var(--bg-hover); }
+.user-group-label { font-family: var(--font-heading); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+
+/* ── Pills / tags / badges ───────────────────────────────────────── */
+.profile-popup-role, .lfg-mode-tag, .lfg-member, .profile-gameid { border-radius: var(--ma-radius-pill); }
+
+/* ── Server rail bubbles (the multi-server column) ──────────────── */
+.server-bar-item, .server-icon, .server-bubble {
+  transition: border-radius var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+.server-bar-item:hover, .server-icon:hover { transform: translateY(-1px); }
+.server-bar-item.active, .server-icon.active { box-shadow: 0 0 0 2px var(--accent), 0 4px 12px -4px var(--accent-glow); }
+
+/* ── Global accessible focus ring ────────────────────────────────── */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Auth (login) page ───────────────────────────────────────────── */
+.auth-page, body.auth-page {
+  background:
+    radial-gradient(900px 500px at 20% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(800px 600px at 110% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%),
+    var(--bg-primary);
+}
+.auth-card {
+  border-radius: var(--ma-radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--ma-shadow-lg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 92%, var(--accent) 8%), var(--bg-secondary));
+}
+.auth-header .logo { font-size: 2.4rem; }
+.auth-tab.active { color: var(--accent-text); }
+
+/* Respect reduced-motion for all the little lifts/transitions above. */
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .btn-accent:hover, .btn:hover, .user-item:hover .avatar, .server-bar-item:hover { transform: none !important; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FACE-TO-FACE · webcam / video-call grid
+   The centrepiece of the app — make it feel like a real call. Layers over
+   the functional rules in style.css (sizing, layout modes, focus mode and
+   the size slider stay owned by the base CSS + JS). Theme-aware via tokens.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Stage — glassy, with a glowing cyan lip along the top */
+.webcam-container {
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--bg-secondary) 88%, var(--accent) 6%),
+      color-mix(in srgb, var(--bg-primary) 92%, #000 8%));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
+  box-shadow:
+    inset 0 2px 0 0 color-mix(in srgb, var(--accent) 60%, transparent),
+    inset 0 -18px 40px -30px var(--accent-glow),
+    var(--ma-shadow-sm);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* Header — quiet label with a live dot, tidy controls */
+.webcam-header {
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-secondary);
+  letter-spacing: .01em;
+}
+#webcam-label {
+  display: inline-flex; align-items: center; gap: .45rem;
+  font-family: var(--font-heading, inherit);
+  font-weight: 600; color: var(--text-primary);
+}
+#webcam-label::before {
+  content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 8px var(--accent-glow);
+  animation: ma-live 2s ease-in-out infinite;
+}
+@keyframes ma-live { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.7); } }
+.webcam-header .icon-btn.small {
+  border-radius: var(--radius-sm);
+  transition: background var(--transition), color var(--transition);
+}
+.webcam-header .icon-btn.small:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text-primary);
+}
+
+/* Grid — a little more air between faces */
+.webcam-grid { gap: .625rem; padding: .625rem .75rem; }
+
+/* Tile — rounded, real depth, soft placeholder while the camera warms up */
+.webcam-tile {
+  border-radius: var(--ma-radius-lg);
+  background: radial-gradient(130% 120% at 50% -10%,
+              color-mix(in srgb, var(--accent) 10%, #0c0f16), #090a0f);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 9%, transparent);
+  box-shadow: var(--ma-shadow);
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.webcam-tile:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  box-shadow: var(--ma-shadow-lg), var(--ma-ring);
+}
+.webcam-tile video { border-radius: inherit; background: #05060a; }
+
+/* Active speaker — a living cyan ring driven by real mic level (see app-voice.js) */
+.webcam-tile.speaking {
+  border-color: var(--accent);
+  animation: ma-speaking 1.3s ease-in-out infinite;
+}
+@keyframes ma-speaking {
+  0%,100% { box-shadow: 0 0 0 2px var(--accent), 0 0 16px -4px var(--accent-glow), var(--ma-shadow); }
+  50%     { box-shadow: 0 0 0 2px var(--accent), 0 0 30px  0   var(--accent-glow), var(--ma-shadow); }
+}
+
+/* Name — a floating glass pill, bottom-left (not a full-width bar) */
+.webcam-tile-label {
+  left: .5rem; right: auto; bottom: .5rem; width: auto;
+  max-width: calc(100% - 1rem);
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .22rem .55rem;
+  font-size: .68rem; font-weight: 600; color: #fff; text-align: left;
+  background: color-mix(in srgb, #000 52%, transparent);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: var(--ma-radius-pill);
+  box-shadow: var(--ma-shadow-sm);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.webcam-tile.speaking .webcam-tile-label {
+  background: color-mix(in srgb, var(--accent) 82%, #000);
+  color: var(--accent-text); border-color: transparent;
+}
+
+/* Controls — circular glass buttons that read as call controls */
+.webcam-tile .stream-popout-btn,
+.webcam-tile .stream-fullscreen-btn,
+.webcam-tile .stream-minimize-btn,
+.webcam-tile .stream-close-btn {
+  width: 1.75rem; height: 1.75rem; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, #000 42%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.16);
+  color: #fff; font-size: .8rem; line-height: 1;
+  box-shadow: var(--ma-shadow-sm);
+  transition: background var(--transition), transform var(--transition), opacity var(--transition);
+}
+.webcam-tile .stream-popout-btn:hover,
+.webcam-tile .stream-fullscreen-btn:hover,
+.webcam-tile .stream-minimize-btn:hover {
+  background: color-mix(in srgb, var(--accent) 78%, #000);
+  color: var(--accent-text); transform: scale(1.08);
+}
+.webcam-tile .stream-close-btn:hover {
+  background: #e5484d; color: #fff; border-color: transparent; transform: scale(1.08);
+}
+.webcam-tile .stream-popout-btn     { top: .4rem; left: .4rem; }
+.webcam-tile .stream-fullscreen-btn { top: .4rem; left: 2.3rem; }
+.webcam-tile .stream-minimize-btn   { top: .4rem; right: 2.3rem; left: auto; }
+.webcam-tile .stream-close-btn      { top: .4rem; right: .4rem; left: auto; }
+
+/* Focus mode — cinematic single-face stage */
+.webcam-container.webcam-focus-mode {
+  background: radial-gradient(90% 120% at 50% 0%, color-mix(in srgb, var(--accent) 7%, #05070c), #04050a);
+}
+.webcam-container.webcam-focus-mode .webcam-tile.webcam-focused {
+  border-radius: var(--radius);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  box-shadow: var(--ma-shadow-lg);
+}
+
+/* Camera toggle in the voice bar — unmistakably "on" while live */
+#voice-cam-btn.sharing, #voice-cam-btn.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* Touch devices have no hover — keep the controls reachable */
+@media (hover: none) {
+  .webcam-tile .stream-popout-btn,
+  .webcam-tile .stream-fullscreen-btn,
+  .webcam-tile .stream-minimize-btn,
+  .webcam-tile .stream-close-btn { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #webcam-label::before, .webcam-tile.speaking { animation: none; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FACE-TO-FACE · Tier 1 — presence tiles, mute badges, gallery layout
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Camera-off presence tile — avatar/initial on the same glass stage as a live
+   tile (Meet/Zoom style: no video, just who is here). */
+.webcam-tile.webcam-presence {
+  aspect-ratio: 16 / 9;
+  width: clamp(9rem, 18vw, 15rem);
+}
+.webcam-presence-body {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.webcam-presence-avatar {
+  width: 34%; max-width: 88px; min-width: 42px; aspect-ratio: 1;
+  border-radius: 50%; object-fit: cover;
+  box-shadow: 0 4px 16px rgba(0,0,0,.45),
+              0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.webcam-presence-initial {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-heading, inherit); font-weight: 700;
+  font-size: clamp(1rem, 4vw, 2rem); color: #fff;
+  background: color-mix(in srgb, var(--accent) 55%, #2a2f3a);
+}
+.webcam-tile.webcam-presence.speaking .webcam-presence-avatar {
+  box-shadow: 0 4px 16px rgba(0,0,0,.45), 0 0 0 3px var(--accent);
+}
+
+/* Mic-muted badge (bottom-right, on any tile) */
+.webcam-mute-badge {
+  position: absolute; right: .45rem; bottom: .5rem; z-index: 4;
+  width: 1.35rem; height: 1.35rem; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .72rem; line-height: 1;
+  background: color-mix(in srgb, #e5484d 88%, #000); color: #fff;
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: var(--ma-shadow-sm);
+}
+.webcam-mute-badge[hidden] { display: none !important; }
+.webcam-tile.is-muted .webcam-tile-label { max-width: calc(100% - 2.6rem); }
+
+/* ── Gallery / spotlight layout: fill the area with a tidy uniform 16:9 grid ── */
+.webcam-container.webcam-gallery-mode {
+  max-height: none !important;
+  flex: 1 1 auto; min-height: 50vh;
+}
+.webcam-container.webcam-gallery-mode .webcam-grid.layout-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: .75rem; padding: .85rem;
+  max-height: none !important; height: auto; flex: 1;
+  align-content: center; justify-items: center; overflow: auto;
+}
+.webcam-container.webcam-gallery-mode .webcam-grid.layout-gallery .webcam-tile {
+  width: 100% !important; max-width: 42rem !important; height: auto !important;
+  min-width: 0; margin: 0 auto; aspect-ratio: 16 / 9;
+}
+.webcam-container.webcam-gallery-mode .webcam-grid.layout-gallery .webcam-tile video {
+  width: 100% !important; height: 100% !important; max-height: none !important;
+  object-fit: cover;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FACE-TO-FACE · Tier 2 — pin/spotlight, live list speaking cue
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Pin button — matches the other circular glass call-controls, sits next to
+   fullscreen in the top-left cluster. */
+.webcam-tile .stream-pin-btn {
+  position: absolute; top: .4rem; left: 4.2rem;
+  width: 1.75rem; height: 1.75rem; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, #000 42%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.16);
+  color: #fff; font-size: .8rem; line-height: 1; z-index: 3;
+  opacity: 0; cursor: pointer;
+  transition: background var(--transition), transform var(--transition), opacity var(--transition);
+}
+.webcam-tile:hover .stream-pin-btn { opacity: 1; }
+.webcam-tile .stream-pin-btn:hover {
+  background: color-mix(in srgb, var(--accent) 78%, #000);
+  color: var(--accent-text); transform: scale(1.08);
+}
+.webcam-tile .stream-pin-btn.active {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 85%, #000);
+  color: var(--accent-text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+@media (hover: none) { .webcam-tile .stream-pin-btn { opacity: 1; } }
+
+/* Spotlight mode — one big view, the rest as a wrapped row of thumbnails.
+   Uses !important on display so it wins over any layout-* mode (incl. gallery). */
+.webcam-container.webcam-spotlight-mode {
+  max-height: none !important; flex: 1 1 auto; min-height: 50vh;
+}
+.webcam-container.webcam-spotlight-mode .webcam-grid {
+  display: flex !important; flex-wrap: wrap; gap: .55rem;
+  align-content: flex-start; justify-content: center;
+  max-height: none !important; height: auto; overflow: auto; padding: .75rem;
+}
+.webcam-container.webcam-spotlight-mode .webcam-tile {
+  max-width: none !important;
+}
+.webcam-container.webcam-spotlight-mode .webcam-tile.webcam-pinned {
+  flex: 1 1 100%; width: 100% !important; max-width: 60rem !important;
+  aspect-ratio: 16 / 9; margin: 0 auto; order: -1;
+}
+.webcam-container.webcam-spotlight-mode .webcam-tile.webcam-pinned video {
+  width: 100% !important; height: 100% !important; max-height: none !important;
+  object-fit: contain; background: #05060a;
+}
+.webcam-container.webcam-spotlight-mode .webcam-tile:not(.webcam-pinned) {
+  flex: 0 0 auto; width: clamp(7rem, 13vw, 11rem) !important; height: auto !important;
+  aspect-ratio: 16 / 9; min-width: 0;
+}
+
+/* Live active-speaker cue in the voice participant list (Tier 2 item 6) */
+.voice-user-item.talking {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-sm);
+}
+.voice-user-item.talking .user-avatar-wrapper,
+.voice-user-item.talking .user-item-avatar {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 10px -2px var(--accent-glow);
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .voice-user-item.talking .user-avatar-wrapper { transition: box-shadow .12s ease; }
+}
+
+
+/* Connection-quality signal (Tier 2 item 5) — 3 bars, colour by level.
+   Sits bottom-right; shifts left to make room for the mute badge when muted. */
+.webcam-quality {
+  position: absolute; right: .5rem; bottom: .5rem; z-index: 4;
+  display: flex; align-items: flex-end; gap: 2px; height: 1rem; padding: .1rem .3rem;
+  border-radius: .5rem; background: color-mix(in srgb, #000 42%, transparent);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+}
+.webcam-tile.is-muted .webcam-quality { right: 2.25rem; }
+.webcam-quality i { width: 3px; border-radius: 1px; background: rgba(255,255,255,.28); }
+.webcam-quality i:nth-child(1) { height: 4px; }
+.webcam-quality i:nth-child(2) { height: 7px; }
+.webcam-quality i:nth-child(3) { height: 10px; }
+.webcam-quality.q-good i { background: #3ad07a; }
+.webcam-quality.q-ok   i:nth-child(-n+2) { background: #f5a623; }
+.webcam-quality.q-poor i:nth-child(1) { background: #e5484d; }
+
+/* HD (720p) toggle in the webcam header (Tier 2 item 8) */
+.webcam-hd-btn { font-size: .62rem !important; font-weight: 700; letter-spacing: .02em; }
+.webcam-hd-btn.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+  color: var(--accent) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   FACE-TO-FACE · Tier 3 — a11y focus, reconnecting overlay, blur toggle
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Keyboard focus ring on webcam controls (item 9); reveal hover-only controls
+   when they receive keyboard focus. */
+.webcam-tile button:focus-visible,
+.webcam-header button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  opacity: 1 !important;
+}
+
+/* Reconnecting overlay on a stalled tile (item 10) */
+.webcam-reconnecting {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem;
+  background: color-mix(in srgb, #05060a 62%, transparent);
+  -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+  color: #fff; font-size: .72rem; font-weight: 600; letter-spacing: .01em;
+}
+.webcam-reconnecting-spin {
+  width: 1.6rem; height: 1.6rem; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.25); border-top-color: var(--accent);
+  animation: ma-spin .8s linear infinite;
+}
+@keyframes ma-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .webcam-reconnecting-spin { animation: none; } }
+
+/* Background-blur toggle active state (item 11) */
+.webcam-blur-btn.active {
+  background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+  color: var(--accent) !important;
+}
+
+
+/* XP / level bar in the player card (gamer stats) */
+.gs-level { display: flex; align-items: center; gap: .5rem; margin: .35rem 0 .55rem; flex-wrap: wrap; }
+.gs-level-badge { font-weight: 700; font-size: .78rem; color: var(--accent); white-space: nowrap; }
+.gs-level-bar {
+  flex: 1 1 6rem; min-width: 5rem; height: .5rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent); overflow: hidden;
+}
+.gs-level-fill {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-hover), var(--accent));
+  box-shadow: 0 0 8px -1px var(--accent-glow); transition: width .4s ease;
+}
+.gs-level-xp { font-size: .66rem; color: var(--text-muted); white-space: nowrap; }
+
+
+/* ══ My Games / Find Players hub ══ */
+.games-body { padding: 1rem 1.1rem; max-height: 70vh; overflow-y: auto; }
+.games-hint { color: var(--text-muted); font-size: .78rem; margin-bottom: .6rem; }
+.games-grid { display: flex; flex-direction: column; gap: .35rem; }
+.game-row {
+  display: flex; align-items: center; gap: .6rem; padding: .5rem .65rem;
+  border-radius: var(--radius-sm); background: var(--ma-surface);
+  border: 1px solid transparent; cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.game-row:hover { background: var(--bg-hover); }
+.game-row.mine {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--ma-surface));
+}
+.game-row-icon { font-size: 1.1rem; }
+.game-row-name { flex: 1; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.game-row-count { font-size: .72rem; color: var(--text-muted); white-space: nowrap; }
+.game-star {
+  background: none; border: none; font-size: 1.15rem; cursor: pointer;
+  color: var(--text-muted); line-height: 1; padding: 0 .2rem;
+  transition: transform var(--transition), color var(--transition);
+}
+.game-star:hover { transform: scale(1.15); }
+.game-star.on { color: var(--accent); text-shadow: 0 0 8px var(--accent-glow); }
+.games-back { background: none; border: none; color: var(--accent); cursor: pointer; font-weight: 600; font-size: .8rem; padding: 0 0 .5rem; }
+.games-players-head { font-family: var(--font-heading, inherit); font-weight: 700; margin-bottom: .6rem; color: var(--text-primary); }
+.games-players { display: flex; flex-direction: column; gap: .25rem; }
+.gp-row { display: flex; align-items: center; gap: .55rem; padding: .4rem .5rem; border-radius: var(--radius-sm); cursor: pointer; }
+.gp-row:hover { background: var(--bg-hover); }
+.gp-dot { width: .5rem; height: .5rem; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.gp-dot.on { background: #3ad07a; box-shadow: 0 0 6px rgba(58,208,122,.5); }
+.gp-avatar { width: 1.6rem; height: 1.6rem; border-radius: 50%; object-fit: cover; }
+.gp-initial { display: inline-flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: .72rem; }
+.gp-name { font-weight: 500; color: var(--text-primary); }
+
+/* "Plays:" chips on the player card */
+.gs-games { display: flex; flex-wrap: wrap; gap: .3rem; margin: .1rem 0 .4rem; }
+.gs-game-chip {
+  font-size: .68rem; padding: .12rem .45rem; border-radius: var(--ma-radius-pill);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-secondary); border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  white-space: nowrap;
+}
+
+
+/* ══ Squads / teams hub ══ */
+.squads-body { padding: 1rem 1.1rem; max-height: 72vh; overflow-y: auto; }
+.squad-tabs { display: flex; gap: .4rem; margin-bottom: .8rem; border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent); }
+.squad-tab { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-weight: 600; font-size: .82rem; padding: .4rem .7rem; border-bottom: 2px solid transparent; }
+.squad-tab:hover { color: var(--text-primary); }
+.squad-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.squad-section-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin: .7rem 0 .4rem; font-weight: 700; }
+.squad-list { display: flex; flex-direction: column; gap: .35rem; }
+.squad-row, .squad-invite-row { display: flex; align-items: center; gap: .6rem; padding: .55rem .7rem; border-radius: var(--radius-sm); background: var(--ma-surface); cursor: pointer; }
+.squad-row:hover { background: var(--bg-hover); }
+.squad-invite-row { cursor: default; }
+.squad-name { flex: 1; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.squad-tag { color: var(--accent); font-weight: 700; }
+.squad-members { font-size: .74rem; color: var(--text-muted); white-space: nowrap; }
+.squad-role { font-size: .62rem; text-transform: uppercase; letter-spacing: .03em; padding: .1rem .4rem; border-radius: var(--ma-radius-pill); font-weight: 700; }
+.squad-role-owner { background: color-mix(in srgb, #f5a623 30%, transparent); color: #f5a623; }
+.squad-role-captain { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--accent); }
+.squad-role-member { background: color-mix(in srgb, var(--text-primary) 12%, transparent); color: var(--text-secondary); }
+.squad-invite-by { font-size: .72rem; color: var(--text-muted); }
+.squad-invite-actions { display: flex; gap: .35rem; }
+.squad-create { display: flex; flex-direction: column; gap: .55rem; max-width: 26rem; }
+.squad-create textarea.lfg-input { resize: vertical; }
+.squad-detail-head { font-family: var(--font-heading, inherit); font-weight: 700; font-size: 1.05rem; color: var(--text-primary); display: flex; align-items: center; gap: .5rem; margin: .4rem 0; }
+.squad-desc { color: var(--text-secondary); font-size: .82rem; margin-bottom: .7rem; }
+.squad-roster { display: flex; flex-direction: column; gap: .25rem; }
+.squad-member-row { display: flex; align-items: center; gap: .55rem; padding: .35rem .45rem; border-radius: var(--radius-sm); }
+.squad-member-row:hover { background: var(--bg-hover); }
+.squad-member-actions { margin-left: auto; display: flex; gap: .3rem; }
+.squad-invite-box { margin: .5rem 0 .8rem; }
+.squad-candidates { display: flex; flex-direction: column; gap: 2px; margin-top: .3rem; max-height: 12rem; overflow-y: auto; }
+.squad-candidate { padding: .35rem .5rem; border-radius: var(--radius-sm); background: var(--ma-surface); cursor: pointer; font-size: .82rem; }
+.squad-candidate:hover { background: color-mix(in srgb, var(--accent) 16%, var(--bg-hover)); }
+.squad-cand-empty { color: var(--text-muted); font-size: .74rem; padding: .3rem .5rem; }
+.squad-detail-footer { display: flex; gap: .5rem; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent); }
+.btn-danger { background: color-mix(in srgb, #e5484d 88%, #000); color: #fff; }
+.btn-danger:hover { background: #e5484d; }
+/* invite badge on the sidebar squads button */
+.squads-badge { position: absolute; top: 2px; right: 2px; min-width: 1rem; height: 1rem; padding: 0 .2rem; border-radius: 999px; background: #e5484d; color: #fff; font-size: .58rem; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+#squads-btn { position: relative; }
+/* squad chips on the player card */
+.gs-squad-chip { font-size: .68rem; padding: .12rem .45rem; border-radius: var(--ma-radius-pill); background: color-mix(in srgb, #f5a623 14%, transparent); color: var(--text-secondary); border: 1px solid color-mix(in srgb, #f5a623 26%, transparent); white-space: nowrap; }
+
+
+/* Self-assignable roles picker (profile self-view) */
+.profile-selfroles { margin: .4rem 0 .2rem; }
+.selfrole-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+.selfrole-chip {
+  font-size: .7rem; padding: .18rem .55rem; border-radius: var(--ma-radius-pill); cursor: pointer;
+  background: color-mix(in srgb, var(--rc, var(--accent)) 12%, transparent);
+  color: var(--text-secondary); border: 1px solid color-mix(in srgb, var(--rc, var(--accent)) 30%, transparent);
+  transition: background var(--transition), color var(--transition);
+}
+.selfrole-chip:hover { background: color-mix(in srgb, var(--rc, var(--accent)) 22%, transparent); color: var(--text-primary); }
+.selfrole-chip.on { background: color-mix(in srgb, var(--rc, var(--accent)) 30%, transparent); color: var(--text-primary); border-color: var(--rc, var(--accent)); font-weight: 600; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   MSG ARENA — SHELL OVERHAUL v2   (premium gaming redesign)
+   Appended last so it wins on source order over style.css + the earlier
+   msg-arena layer. Pure restyle: the DOM is untouched, every id/class the
+   JS binds to is preserved, so no function changes. Signature language:
+   a cyan→violet duotone, atmospheric depth, glass panels, restrained neon
+   glow, and tasteful motion (all reduced-motion safe at the bottom).
+   ══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --ma-accent-2:   #a855f7;                                   /* violet — pairs with the cyan accent */
+  --ma-accent-3:   #f43f5e;                                   /* hot magenta for rare highlights     */
+  --ma-grad:       linear-gradient(135deg, var(--accent), var(--ma-accent-2));
+  --ma-grad-rev:   linear-gradient(135deg, var(--ma-accent-2), var(--accent));
+  --ma-grad-soft:  linear-gradient(135deg, color-mix(in srgb, var(--accent) 20%, transparent), color-mix(in srgb, var(--ma-accent-2) 18%, transparent));
+  --ma-glow:       0 0 22px -4px var(--accent-glow);
+  --ma-glow-violet:0 0 22px -4px color-mix(in srgb, var(--ma-accent-2) 60%, transparent);
+  --ma-glass:      color-mix(in srgb, var(--bg-secondary) 62%, transparent);
+  --ma-glass-2:    color-mix(in srgb, var(--bg-tertiary) 66%, transparent);
+  --ma-hairline:   color-mix(in srgb, var(--accent) 16%, var(--border));
+}
+
+/* ── Atmosphere: layered aurora + a faint dot-grid over the workspace ── */
+#app-body, [data-haven-region="workspace"], [data-haven-region="app-shell"] {
+  background:
+    radial-gradient(900px 520px at 6% -12%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 60%),
+    radial-gradient(820px 640px at 106% 2%, color-mix(in srgb, var(--ma-accent-2) 13%, transparent), transparent 58%),
+    radial-gradient(760px 760px at 58% 128%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 56%),
+    var(--bg-primary);
+}
+#app-body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image: radial-gradient(color-mix(in srgb, var(--text-primary) 6%, transparent) 1px, transparent 1px);
+  background-size: 26px 26px; opacity:.45;
+  -webkit-mask-image: radial-gradient(130% 120% at 50% -10%, #000 45%, transparent 92%);
+          mask-image: radial-gradient(130% 120% at 50% -10%, #000 45%, transparent 92%);
+}
+/* keep the real UI above the texture */
+.server-bar, .sidebar, .main, .right-sidebar,
+.right-sidebar-voice, .right-sidebar-users { position: relative; z-index: 1; }
+
+/* ══ Server rail — glassy column, gradient home, glowing active marker ══ */
+.server-bar, [data-haven-region="server-rail"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-tertiary) 88%, #000 12%), var(--bg-tertiary));
+  border-right: 1px solid var(--ma-hairline);
+  gap: 10px;
+}
+.server-icon {
+  position: relative; border-radius: 16px;
+  transition: border-radius var(--transition), transform var(--transition), box-shadow var(--transition), background var(--transition), color var(--transition);
+}
+.server-icon:hover { border-radius: 13px; transform: translateY(-1px); }
+.server-icon.home {
+  background: var(--ma-grad); color: #fff; border: none; box-shadow: var(--ma-glow);
+}
+.server-icon.home .server-icon-text { filter: drop-shadow(0 1px 4px rgba(0,0,0,.45)); }
+.server-icon.active::before {
+  content:''; position:absolute; left:-9px; top:50%; transform:translateY(-50%);
+  width:4px; height:66%; border-radius:0 4px 4px 0; background: var(--ma-grad); box-shadow: var(--ma-glow);
+}
+.server-icon.add-server:hover  { color: var(--accent); border-color: var(--accent); box-shadow: var(--ma-glow); }
+.server-status-dot.online { box-shadow: 0 0 8px 1px color-mix(in srgb, var(--success, #22c55e) 80%, transparent); }
+
+/* ══ Sidebar shell ══════════════════════════════════════════════════ */
+.sidebar, [data-haven-region="navigation-sidebar"] {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 94%, var(--accent) 6%), var(--bg-secondary) 40%, color-mix(in srgb, var(--bg-secondary) 96%, #000 4%));
+  border-right: 1px solid var(--ma-hairline);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, #fff 3%, transparent);
+}
+.sidebar-header { border-bottom: 1px solid var(--ma-hairline); }
+
+/* Brand lockup */
+.brand { gap: 9px; }
+.brand .logo-sm { font-size: 1.15rem; filter: drop-shadow(0 0 12px var(--accent-glow)); }
+.brand-text {
+  font-family: var(--ma-display); font-weight: 700; letter-spacing: 1.6px; font-size: 1.02rem;
+  background: var(--ma-grad); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+
+/* User "player-card" chip */
+.user-bar {
+  background: var(--ma-grad-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 7%, transparent), var(--ma-shadow-sm);
+}
+.user-bar .current-user { font-weight: 650; letter-spacing:.2px; }
+.user-bar .led.on { box-shadow: 0 0 9px 1px color-mix(in srgb, var(--success,#22c55e) 85%, transparent); }
+.user-bar .icon-btn:hover { color: var(--accent); }
+
+/* Section labels — quiet, tracked, with a tiny gradient tick */
+.section-label, .panel-title, .sidebar-section > h5 {
+  text-transform: uppercase; letter-spacing: 1.1px; font-size: .68rem; font-weight: 700;
+  color: var(--text-muted);
+}
+.section-label .section-label-text::before {
+  content:''; display:inline-block; width:10px; height:2px; margin-right:7px; vertical-align:middle;
+  border-radius:2px; background: var(--ma-grad);
+}
+
+/* Join-a-channel: sleek field + gradient CTA */
+[data-mod-id="join"] input[type="text"], #join-code-input {
+  border-radius: var(--ma-radius-pill); background: var(--ma-glass-2);
+  border: 1px solid var(--border);
+}
+[data-mod-id="join"] .btn-accent, [data-mod-id="join"] button {
+  border-radius: var(--ma-radius-pill);
+}
+
+/* Channel rows — stronger active state with duotone edge + glow */
+.channel-item.active, .channel-item.selected {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, transparent), color-mix(in srgb, var(--ma-accent-2) 10%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.channel-item.active::before, .channel-item.selected::before {
+  background: var(--ma-grad); box-shadow: var(--ma-glow); height: 62%;
+}
+
+/* ══ THE BOTTOM BAR (the reported breakage) ══════════════════════════
+   Base laid 14 buttons in a single no-wrap flex row → they overflowed the
+   sidebar and clipped. Reflow into a tidy auto-fitting tile grid: every
+   launcher fits, wraps to as many rows as needed, and now reads as an
+   intentional dock instead of a cut-off strip. ── */
+.sidebar-bottom { border-top: 1px solid var(--ma-hairline); background: color-mix(in srgb, var(--bg-secondary) 70%, #000 6%); }
+.sidebar-bottom-bar {
+  /* A sleek single-row launcher DOCK: everything on one line, scrolled smoothly
+     with soft fade edges — reads as an intentional dock, not an overflow. */
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 10px 14px 11px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-light) transparent;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+}
+.sidebar-bottom-bar::-webkit-scrollbar { height: 6px; }
+.sidebar-bottom-bar::-webkit-scrollbar-track { background: transparent; }
+.sidebar-bottom-bar::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 30%, var(--border-light)); border-radius: 999px; }
+.sidebar-bottom-bar:hover::-webkit-scrollbar-thumb { background: var(--accent-dim, var(--accent)); }
+.sidebar-bottom-btn {
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 38px; height: 38px; padding: 0; font-size: 1.04rem; line-height: 1;
+  background: var(--ma-glass-2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text-secondary);
+  transition: transform var(--transition), box-shadow var(--transition), background var(--transition), border-color var(--transition), color var(--transition);
+}
+.sidebar-bottom-btn:hover {
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--accent) 15%, var(--bg-tertiary));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  color: var(--text-primary);
+  box-shadow: var(--ma-glow);
+}
+.sidebar-bottom-btn:active { transform: translateY(0); }
+.sidebar-bottom-btn.donate-btn:hover {
+  background: color-mix(in srgb, var(--ma-accent-3) 18%, var(--bg-tertiary));
+  border-color: color-mix(in srgb, var(--ma-accent-3) 55%, var(--border));
+  box-shadow: 0 0 22px -4px color-mix(in srgb, var(--ma-accent-3) 55%, transparent);
+}
+/* squad-invite badge sits on the tile corner cleanly */
+.sidebar-bottom-btn { position: relative; overflow: visible; }
+
+/* ══ Main column ════════════════════════════════════════════════════ */
+.channel-header, [data-haven-region="channel-header"] {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 78%, transparent), color-mix(in srgb, var(--bg-secondary) 55%, transparent));
+  backdrop-filter: saturate(1.3) blur(10px); -webkit-backdrop-filter: saturate(1.3) blur(10px);
+  border-bottom: 1px solid var(--ma-hairline);
+}
+.channel-header h3, #channel-header-name { font-family: var(--font-heading); letter-spacing:-.2px; font-weight:700; }
+
+/* Welcome / empty state → a designed hero */
+.welcome-screen { position: relative; }
+.welcome-screen::before {
+  content:''; position:absolute; left:50%; top:42%; width:520px; height:520px; transform:translate(-50%,-50%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent), transparent 62%);
+  filter: blur(24px); pointer-events:none; z-index:0;
+}
+.welcome-content {
+  position: relative; z-index: 1;
+  max-width: 560px; padding: 44px 46px; border-radius: 28px;
+  background: color-mix(in srgb, var(--bg-secondary) 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--border));
+  backdrop-filter: blur(12px) saturate(1.2); -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  box-shadow: var(--ma-shadow-lg);
+}
+.welcome-icon {
+  font-size: 4.4rem; line-height: 1; margin-bottom: 12px; display:inline-block;
+  background: var(--ma-grad); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  filter: drop-shadow(0 0 30px var(--accent-glow));
+  animation: ma-float 6.5s ease-in-out infinite;
+}
+.welcome-content h2 {
+  font-family: var(--ma-display); font-weight: 700; font-size: 2.05rem; letter-spacing:-.4px; margin:.2em 0 .35em;
+  background: linear-gradient(92deg, var(--text-primary), color-mix(in srgb, var(--accent) 70%, var(--text-primary)));
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+.welcome-content p { color: var(--text-secondary); font-size: 1.02rem; line-height: 1.6; }
+
+/* Composer — elevated rounded field with a focus glow */
+.message-input-area, [data-haven-region="composer"] {
+  background: var(--ma-glass); border-top: 1px solid var(--ma-hairline);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+#message-input, .message-input {
+  border-radius: 14px !important;
+  background: color-mix(in srgb, var(--bg-tertiary) 80%, transparent) !important;
+  border: 1px solid var(--border) !important;
+  transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+}
+#message-input:focus, .message-input:focus {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border)) !important;
+  box-shadow: 0 0 0 3px var(--accent-glow), var(--ma-glow) !important;
+}
+
+/* ══ Right panel — cards for voice + online ═════════════════════════ */
+.right-sidebar, .right-sidebar-voice, .right-sidebar-users,
+[data-haven-region="member-list"], [data-haven-region="voice-roster"] {
+  background: linear-gradient(180deg, var(--bg-secondary), color-mix(in srgb, var(--bg-secondary) 92%, #000 8%));
+  border-left: 1px solid var(--ma-hairline);
+}
+.right-sidebar-voice .panel, .right-sidebar-users .panel {
+  border-radius: 14px;
+}
+.panel-title .title-emoji { filter: drop-shadow(0 0 6px var(--accent-glow)); }
+.user-list .user-item:hover, .member-item:hover, .user-row:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 10px;
+}
+
+/* ══ Buttons / inputs / modals — cohesive premium finish ════════════ */
+.btn-accent, .btn-send, .thread-send-btn, .btn-admin-save, .btn-voice, .btn-primary {
+  background: var(--ma-grad) !important; color: #fff !important; border: none !important;
+  box-shadow: 0 4px 16px -4px var(--accent-glow);
+}
+.btn-accent:hover, .btn-send:hover, .thread-send-btn:hover, .btn-admin-save:hover, .btn-voice:hover, .btn-primary:hover {
+  filter: brightness(1.06); transform: translateY(-1px);
+  box-shadow: 0 8px 24px -6px var(--accent-glow), var(--ma-glow-violet);
+}
+.modal, .modal-content, .settings-modal, [data-haven-region="modal"] {
+  border: 1px solid var(--ma-hairline) !important;
+  box-shadow: var(--ma-shadow-lg) !important;
+  border-radius: var(--ma-radius-lg) !important;
+}
+.modal::before, .modal-content::before {
+  content:''; position:absolute; inset:0 0 auto 0; height:2px; border-radius: var(--ma-radius-lg) var(--ma-radius-lg) 0 0;
+  background: var(--ma-grad); opacity:.9; pointer-events:none;
+}
+.modal, .modal-content { position: relative; }
+
+/* Join Voice pill in the header/right panel */
+#join-voice-btn, .join-voice-btn, .btn-voice {
+  border-radius: var(--ma-radius-pill);
+}
+
+/* ══ Motion ═════════════════════════════════════════════════════════ */
+@keyframes ma-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes ma-pulse { 0%,100% { opacity:1; } 50% { opacity:.55; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-icon { animation: none; }
+  .server-icon, .sidebar-bottom-btn, .btn-accent, .btn-send, .channel-item { transition: none !important; }
+  .server-icon:hover, .sidebar-bottom-btn:hover, .btn-accent:hover { transform: none !important; }
+}
+
+/* ══ Small-screen safety: the tile grid + hero stay tidy on mobile ══ */
+@media (max-width: 720px) {
+  .welcome-content { padding: 30px 24px; max-width: 92vw; }
+  .welcome-icon { font-size: 3.4rem; }
+  .sidebar-bottom-bar { padding-left: 10px; padding-right: 10px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MSG ARENA — OVERHAUL POLISH PASS  (adds energy; refines details)
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Cleaner section labels — the collapse arrow is enough; drop the extra tick */
+.section-label .section-label-text::before { content: none; }
+
+/* More life in the backdrop aurora */
+#app-body, [data-haven-region="workspace"], [data-haven-region="app-shell"] {
+  background:
+    radial-gradient(900px 540px at 3% -14%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 60%),
+    radial-gradient(860px 660px at 109% 0%, color-mix(in srgb, var(--ma-accent-2) 17%, transparent), transparent 58%),
+    radial-gradient(820px 820px at 55% 134%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 56%),
+    var(--bg-primary);
+}
+
+/* Welcome hero → a living centerpiece: bigger mark + a soft rotating glow ring */
+.welcome-content { padding: 52px 54px; }
+.welcome-icon { font-size: 5rem; position: relative; z-index: 2; }
+.welcome-screen::after {
+  content:''; position:absolute; left:50%; top:41%; width:280px; height:280px; transform:translate(-50%,-50%);
+  border-radius:50%; pointer-events:none; z-index:0;
+  background: conic-gradient(from 0deg,
+    transparent, color-mix(in srgb,var(--accent) 34%,transparent), transparent 42%,
+    color-mix(in srgb,var(--ma-accent-2) 34%,transparent), transparent 78%);
+  filter: blur(28px); opacity:.6; animation: ma-spin 16s linear infinite;
+}
+@keyframes ma-spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+
+/* Channel header hairline gradient underglow */
+.channel-header, [data-haven-region="channel-header"] { position: relative; }
+.channel-header::after {
+  content:''; position:absolute; left:0; right:0; bottom:-1px; height:1px; pointer-events:none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb,var(--accent) 55%,transparent),
+              color-mix(in srgb,var(--ma-accent-2) 45%,transparent), transparent);
+  opacity:.55;
+}
+
+/* Keep the new motion reduced-motion safe */
+@media (prefers-reduced-motion: reduce) {
+  .welcome-screen::after { animation: none; }
+}
+
+/* ── Hotfix: the launcher bar's old flex spacer (an empty <span style="flex:1">)
+   is meaningless in the grid layout and rendered as a stray empty tile-cell
+   (looked like an extra blank button). Hide it. ── */
+.sidebar-bottom-bar > span { display: none; }
+
+/* ── Gamer engagement: streak chip (player card) + level-role admin rows ── */
+.gs-streak {
+  display:inline-flex; align-items:center; gap:4px; margin-left:8px;
+  font-size:.74rem; font-weight:700; padding:2px 9px; border-radius:var(--ma-radius-pill);
+  color:#fdba74; white-space:nowrap;
+  background: color-mix(in srgb, #f97316 16%, transparent);
+  border: 1px solid color-mix(in srgb, #f97316 42%, transparent);
+}
+#level-roles-list .level-role-row { padding:2px 0; }
+#level-roles-list .gs-level-badge { font-size:.72rem; padding:2px 8px; border-radius:8px; background:var(--ma-glass-2); border:1px solid var(--border); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   MSG ARENA — SETTINGS OVERHAUL  (structure via search + gaming-grade polish)
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Live-filter hide class — used by the settings search (never fights the
+   per-permission inline visibility the admin code sets). */
+.settings-search-hidden { display: none !important; }
+
+/* ── Search box (sticky at the top of the nav) ── */
+.settings-search-wrap {
+  position: sticky; top: 0; z-index: 4;
+  display: flex; align-items: center; gap: 6px;
+  margin: 2px 8px 10px; padding: 7px 11px;
+  background: var(--ma-glass-2);
+  border: 1px solid var(--border); border-radius: var(--ma-radius-pill);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.settings-search-wrap:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--border));
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.settings-search-icon { font-size: .78rem; opacity: .65; }
+.settings-search-input {
+  flex: 1; min-width: 0; border: none !important; background: transparent !important;
+  box-shadow: none !important; padding: 0 !important; margin: 0 !important;
+  font-size: .8rem; color: var(--text-primary); outline: none;
+}
+.settings-search-clear {
+  border: none; background: transparent; color: var(--text-muted);
+  cursor: pointer; font-size: 1.05rem; line-height: 1; padding: 0 2px;
+}
+.settings-search-clear:hover { color: var(--text-primary); }
+.settings-search-empty {
+  margin: 4px 14px 12px; padding: 12px 14px; font-size: .82rem; color: var(--text-muted);
+  border: 1px dashed var(--border); border-radius: 12px; text-align: center;
+}
+
+/* ── Header: glass + gradient wordmark + gradient tab pill ── */
+.settings-header {
+  background: var(--ma-glass) !important;
+  backdrop-filter: blur(12px) saturate(1.2); -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  border-bottom: 1px solid var(--ma-hairline) !important;
+}
+.settings-header h3 {
+  background: var(--ma-grad); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.settings-tab { border-radius: var(--ma-radius-pill) !important; transition: all var(--transition); }
+.settings-tab.active {
+  background: var(--ma-grad) !important; border-color: transparent !important; color: #fff !important;
+  box-shadow: 0 2px 10px -2px var(--accent-glow);
+}
+
+/* ── Nav: quiet column, gradient active pill, accent group labels ── */
+.settings-nav { background: color-mix(in srgb, var(--bg-secondary) 55%, transparent); }
+.settings-nav-item { transition: background var(--transition), color var(--transition); }
+.settings-nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.settings-nav-item.active {
+  background: var(--ma-grad) !important; color: #fff !important;
+  box-shadow: 0 2px 10px -3px var(--accent-glow);
+}
+.settings-nav-group-label { color: color-mix(in srgb, var(--accent) 50%, var(--text-muted)); }
+
+/* ── Sections as clean cards (replaces the flat scroll wall) ── */
+.settings-body { padding: 6px 2px 28px !important; }
+.settings-section, .admin-settings {
+  margin: 10px 14px !important;
+  padding: 16px 18px !important;
+  background: color-mix(in srgb, var(--bg-secondary) 42%, transparent);
+  border: 1px solid var(--border) !important;
+  border-radius: 14px;
+  box-shadow: var(--ma-shadow-sm);
+}
+.settings-section-title, .settings-section-subtitle {
+  font-family: var(--font-heading); letter-spacing: -.2px;
+  border-bottom: none !important; color: var(--text-primary);
+}
+.settings-hint { line-height: 1.5; }
+
+/* Consistent, tactile toggle / select rows across every section */
+.settings-section .toggle-row, .settings-section .select-row,
+.admin-settings .toggle-row, .admin-settings .select-row {
+  border-radius: 10px; padding: 8px 10px;
+  transition: background var(--transition);
+}
+.settings-section .toggle-row:hover, .settings-section .select-row:hover,
+.admin-settings .toggle-row:hover, .admin-settings .select-row:hover {
+  background: var(--bg-hover);
+}
+
+/* The Gaming section carries the product's signature accent — it should feel
+   like the heart of a gamer messenger, not a buried admin toggle. */
+#section-gaming {
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border)) !important;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+    color-mix(in srgb, var(--bg-secondary) 42%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent), var(--ma-shadow-sm);
+}
+#section-gaming .settings-section-subtitle { color: var(--accent); }
+
+/* ══ Branding: clean custom logo + full-banner fit ══════════════════════ */
+/* A custom server logo drops the accent-gradient backing so a transparent
+   logo's own colours read cleanly, and a solid one is never tinted by it. */
+.server-icon.home.has-custom-logo { background: var(--bg-tertiary); }
+.server-icon.home.has-custom-logo img { border-radius: inherit; }
+/* Match the sidebar brand logo shape to the rail icon for consistency. */
+.brand-icon { border-radius: 9px !important; }
+
+/* "Show whole banner" fit mode — the entire image at full opacity on a neutral
+   backing (default "cover" still fills + crops the strip). */
+.server-banner-display.banner-fit-contain { background: var(--bg-secondary); }
+.server-banner-display.banner-fit-contain .server-banner-img { object-fit: contain !important; opacity: 1 !important; }
+
+/* ── Landing/login footer: crawlable links to the public content pages ── */
+.landing-footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1; padding: 14px 16px; text-align: center; pointer-events: none; }
+.landing-footer nav { display: inline-flex; gap: 18px; flex-wrap: wrap; justify-content: center; pointer-events: auto; }
+.landing-footer a { color: var(--text-muted); font-size: .82rem; font-weight: 600; text-decoration: none; opacity: .85; }
+.landing-footer a:hover { color: var(--accent); opacity: 1; }
+
+/* ══ Player Discovery hub (Find Players + My Games) ═════════════════════ */
+.games-tabs { display: flex; gap: 8px; padding: 4px 4px 12px; }
+.games-tab {
+  flex: 0 0 auto; padding: 8px 16px; border-radius: var(--ma-radius-pill);
+  border: 1px solid var(--border); background: var(--ma-glass-2); color: var(--text-secondary);
+  font-weight: 700; font-size: .85rem; cursor: pointer; transition: all var(--transition);
+}
+.games-tab:hover { color: var(--text-primary); }
+.games-tab.active { background: var(--ma-grad); color: #fff; border-color: transparent; box-shadow: 0 2px 10px -3px var(--accent-glow); }
+
+.games-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 4px 4px 12px; }
+.games-input {
+  padding: 8px 11px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--ma-glass-2); color: var(--text-primary); font-size: .85rem; min-width: 0;
+}
+.games-input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); box-shadow: 0 0 0 3px var(--accent-glow); }
+#gf-q { flex: 1; min-width: 120px; }
+.games-online-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--text-secondary); white-space: nowrap; }
+.games-search-btn { border-radius: 10px !important; padding: 8px 18px; }
+.games-loading, .games-count { padding: 8px 6px; color: var(--text-muted); font-size: .82rem; }
+
+.games-results { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.gp-card {
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent); border: 1px solid var(--border);
+  border-radius: 14px; padding: 12px 14px; cursor: pointer; transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+.gp-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow: var(--ma-glow); }
+.gp-card-head { display: flex; align-items: center; gap: 8px; }
+.gp-card-head .gp-name { font-weight: 650; }
+.gp-meta { color: var(--text-secondary); font-size: .78rem; margin-top: 7px; }
+.gp-games { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.gp-game { font-size: .72rem; padding: 3px 8px; border-radius: 999px; background: var(--ma-glass-2); border: 1px solid var(--border); color: var(--text-secondary); }
+.gp-game b { color: var(--accent); font-weight: 700; }
+
+.games-profile { background: var(--ma-grad-soft); border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border)); border-radius: 14px; padding: 14px 16px; margin: 0 4px 14px; }
+.games-profile-title { font-weight: 700; font-family: var(--font-heading); margin-bottom: 10px; }
+.games-profile-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.games-profile-row label { font-size: .8rem; color: var(--text-secondary); display: flex; flex-direction: column; gap: 4px; }
+.games-profile-label { font-size: .8rem; color: var(--text-secondary); align-self: center; }
+.games-lang-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.games-lang-chip { display: inline-flex; align-items: center; gap: 5px; font-size: .76rem; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--ma-glass-2); color: var(--text-secondary); cursor: pointer; }
+.games-lang-chip.on { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); color: var(--text-primary); background: color-mix(in srgb, var(--accent) 14%, var(--bg-tertiary)); }
+.games-lang-chip input { display: none; }
+.game-rank-input { flex: 0 1 130px; min-width: 0; padding: 4px 8px; font-size: .76rem; border-radius: 8px; border: 1px solid var(--border); background: var(--ma-glass-2); color: var(--text-primary); }
+.game-rank-input:focus { outline: none; border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+
+/* player-card: country + languages + per-game rank */
+.gs-loc { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--text-secondary); margin: 6px 0 2px; }
+.gs-game-chip b { color: var(--accent); font-weight: 700; margin-left: 4px; }
+
+/* ── Fix: action buttons in compact flex rows collapsing under a flex input ──
+   The LFG "Post" (and squad "Create") buttons were shrinking to a sliver next
+   to their flex:1 text field, clipping the label. Keep them at content width. */
+.lfg-create-row .btn-accent,
+.lfg-create-row button[type="submit"],
+.squad-create .btn-accent,
+.squad-create button[type="submit"] {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-width: max-content;
+  /* bare .btn-accent (no .btn-sm) has no padding in the base CSS → the label
+     collapsed edge-to-edge. Give it real padding. */
+  padding: 9px 18px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   CALM PASS — remove the "AI-generated" look.
+   Users read the heavy cyan→violet duotone gradients + light-radiating glows
+   as an AI aesthetic. This flattens the shared tokens (so everything built on
+   them becomes a single solid accent with no glow) and neutralises the few
+   inline gradients/aurora. Structure, spacing and dark theme stay; the flashy
+   light is gone — closer to a clean, flat, Discord-like surface.
+   ══════════════════════════════════════════════════════════════════════ */
+:root {
+  --ma-accent-2:    var(--accent);                                  /* one solid accent, no second hue */
+  --ma-grad:        var(--accent);                                  /* solid, not a gradient */
+  --ma-grad-rev:    var(--accent);
+  --ma-grad-soft:   color-mix(in srgb, var(--accent) 12%, transparent);
+  --ma-glow:        none;                                           /* no light-radiating shadow */
+  --ma-glow-violet: none;
+}
+
+/* Flat workspace — no radiating aurora, no dot grid. */
+#app-body, [data-haven-region="workspace"], [data-haven-region="app-shell"] { background: var(--bg-primary); }
+#app-body::before { content: none !important; display: none !important; }
+
+/* Welcome: no rotating glow ring, solid mark + heading, no blur. */
+.welcome-screen::before, .welcome-screen::after { content: none !important; display: none !important; }
+.welcome-content { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: var(--ma-shadow-sm); }
+.welcome-content h2 { background: none; -webkit-text-fill-color: currentColor; color: var(--text-primary); }
+.welcome-icon { background: none; -webkit-text-fill-color: initial; color: var(--accent); filter: none; animation: none; }
+
+/* Solid brand wordmark (no gradient text, no drop-shadow glow). */
+.brand-text, .auth-header h1 { background: none; -webkit-text-fill-color: var(--accent); color: var(--accent); }
+.logo-sm, .auth-header .logo, .brand .logo-sm { filter: none; }
+
+/* Buttons: one solid accent, readable text, no glow. */
+.btn-accent, .btn-send, .thread-send-btn, .btn-admin-save, .btn-voice, .btn-primary {
+  background: var(--accent) !important; color: var(--accent-text, #06121a) !important; box-shadow: none !important;
+}
+.btn-accent:hover, .btn-send:hover, .thread-send-btn:hover, .btn-admin-save:hover, .btn-voice:hover, .btn-primary:hover {
+  filter: brightness(1.07); box-shadow: none !important; transform: none;
+}
+
+/* Active states: solid accent, no glow. */
+.server-icon.home { background: var(--accent); box-shadow: none; }
+.server-icon.home.has-custom-logo { background: var(--bg-tertiary); }
+.server-icon.active::before, .channel-item.active::before, .channel-item.selected::before { background: var(--accent); box-shadow: none; }
+.channel-item.active, .channel-item.selected {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.settings-tab.active, .settings-nav-item.active, .games-tab.active {
+  background: var(--accent) !important; color: var(--accent-text, #06121a) !important; box-shadow: none !important;
+}
+
+/* Modals + header: keep the thin accent edge but flat (no glow), no big shadows. */
+.modal::before, .modal-content::before { background: var(--accent); opacity: .55; }
+.settings-header h3 { background: none; -webkit-text-fill-color: var(--accent); color: var(--accent); }
+
+/* Player-card / dock accents: solid, calm. */
+.user-bar { background: var(--ma-grad-soft); box-shadow: none; }
+.sidebar-bottom-bar::-webkit-scrollbar-thumb { background: var(--border-light); }
+#section-gaming { background: color-mix(in srgb, var(--accent) 6%, transparent); box-shadow: none; border-color: color-mix(in srgb, var(--accent) 24%, var(--border)) !important; }
+
+/* Focus: a clear ring, not a wide glow. */
+#message-input:focus, .message-input:focus {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent) !important;
+}
+
+/* ── Launcher: every icon visible (wrap, no hidden/scroll), custom SVG icons,
+   animated (springy) hover buttons — no glow, per the calm pass. ── */
+.sidebar-bottom-bar {
+  flex-wrap: wrap;                 /* show ALL launchers; nothing hidden off-screen */
+  overflow: visible;
+  -webkit-mask-image: none; mask-image: none;
+  justify-content: flex-start;
+  gap: 7px;
+}
+.sidebar-bottom-btn svg {
+  width: 19px; height: 19px; display: block;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.sidebar-bottom-btn.donate-btn svg { fill: currentColor; stroke: none; }
+.sidebar-bottom-btn {
+  color: var(--text-secondary);
+  transition: transform .13s cubic-bezier(.34,1.56,.64,1), background .15s ease, color .15s ease, border-color .15s ease;
+}
+.sidebar-bottom-btn:hover {
+  transform: translateY(-2px) scale(1.08);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-tertiary));
+}
+.sidebar-bottom-btn.donate-btn:hover { color: #f0577a; border-color: color-mix(in srgb, #f0577a 50%, var(--border)); background: color-mix(in srgb, #f0577a 12%, var(--bg-tertiary)); }
+.sidebar-bottom-btn:active { transform: translateY(0) scale(.94); }
+@media (prefers-reduced-motion: reduce) { .sidebar-bottom-btn:hover, .sidebar-bottom-btn:active { transform: none; } }
+
+/* ── Desktop app: unified window like Discord ──────────────────────────
+   On Windows the native title bar is hidden and the min/maximise/close controls
+   are painted on a dark overlay bar (set in the desktop app). Reserve the
+   top-right for those controls and make the channel header the drag region, so
+   the whole window reads as one dark surface and nothing sits under the controls. */
+html[data-desktop-app] .channel-header { -webkit-app-region: drag; padding-right: 146px; }
+html[data-desktop-app] .channel-header button,
+html[data-desktop-app] .channel-header input,
+html[data-desktop-app] .channel-header select,
+html[data-desktop-app] .channel-header a,
+html[data-desktop-app] .channel-header [role="button"],
+html[data-desktop-app] .channel-header .icon-btn { -webkit-app-region: no-drag; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.3 — de-clutter pass: fewer borders, consistent button ratios, and a
+   WIDE (not long) registration. Users read "a border around every box" as an
+   AI look; settings now group by spacing + a subtle panel tint instead, and
+   the option cards share one height so nothing looks oversized or cramped.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Settings sections: drop the per-section outline + shadow (that's the boxy
+   "AI" feel). Keep a faint panel tint so groups are still legible. */
+.settings-section, .admin-settings {
+  border: none !important;
+  box-shadow: none !important;
+  background: color-mix(in srgb, var(--bg-secondary) 26%, transparent) !important;
+  margin: 8px 14px !important;
+}
+#section-gaming {
+  border: none !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent) !important;
+  background: color-mix(in srgb, var(--accent) 6%, transparent) !important;
+}
+
+/* Selectable option cards (density / animation / toggle / emoji & reaction
+   size / role display / toolbar icons): one calm 1px edge and one shared
+   height, so the row reads as an even segmented control — not a wall of big
+   bordered boxes at mismatched sizes. */
+.density-btn {
+  border-width: 1px !important;
+  border-color: color-mix(in srgb, var(--border) 70%, transparent) !important;
+  min-height: 48px;
+  justify-content: center !important;
+  padding: 8px 10px !important;
+  transition: background var(--transition), border-color var(--transition) !important;
+}
+.density-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
+  background: var(--bg-hover) !important;
+}
+.density-btn.active {
+  border-color: var(--accent) !important;
+  color: var(--text-primary) !important;
+  background: color-mix(in srgb, var(--accent) 13%, transparent) !important;
+}
+
+/* Small action buttons that sit in rows (View Bans, Cleanup, Invite…): one
+   consistent height + horizontal padding so a row of them lines up instead of
+   each being a different size. */
+.btn-sm { min-height: 32px; padding: 6px 14px !important; font-size: .82rem; }
+.modal-actions .btn-sm, .settings-section .btn-sm { min-height: 34px; }
+
+/* ── Registration: wide, not long ─────────────────────────────────────── */
+/* The brand mark (was a 🎮 emoji) as a clean flat SVG in the accent colour. */
+.auth-header .logo { line-height: 0; margin-bottom: 6px; }
+.auth-header .logo svg { color: var(--accent); display: block; margin: 0 auto; }
+/* Password + Confirm sit side by side; the card widens for the taller forms. */
+.auth-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.auth-container:has(.auth-tab[data-tab="register"].active) { max-width: 32rem; }
+.auth-container:has(.auth-tab[data-tab="sso"].active)      { max-width: 30rem; }
+@media (max-width: 520px) {
+  .auth-2col { grid-template-columns: 1fr; }
+  .auth-container:has(.auth-tab[data-tab="register"].active),
+  .auth-container:has(.auth-tab[data-tab="sso"].active) { max-width: 25rem; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.4 — profile modal header (name beside avatar), side-by-side actions,
+   and a wider login/auth (each auth function gets a fitting width).
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Profile popup: avatar + name/username on one header row (not stacked). */
+.profile-popup-header {
+  display: flex; align-items: flex-end; gap: 14px;
+  padding: 0 16px 2px;
+}
+.profile-popup-header .profile-popup-avatar-wrapper { margin: -2.25rem 0 0 0; flex: 0 0 auto; }
+.profile-popup-header .profile-popup-names {
+  margin: 0 0 4px 0; align-items: flex-start; text-align: left; min-width: 0; flex: 1 1 auto;
+}
+.profile-popup-header .profile-popup-displayname,
+.profile-popup-header .profile-popup-username { text-align: left; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Action buttons side by side, equal width, consistent gap. */
+.profile-popup-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.profile-popup-actions .profile-popup-action-btn {
+  flex: 1 1 0; min-width: 0; justify-content: center; text-align: center;
+}
+
+/* ── Auth: wider, separated by function ───────────────────────────────── */
+/* Login is a touch wider than before; Register/Link Server go wider still for
+   the two-column fields. Each function now reads as its own sized panel. */
+.auth-container { max-width: 27rem; }
+.auth-container:has(.auth-tab[data-tab="register"].active) { max-width: 34rem; }
+.auth-container:has(.auth-tab[data-tab="sso"].active)      { max-width: 31rem; }
+@media (max-width: 560px) {
+  .auth-container,
+  .auth-container:has(.auth-tab[data-tab="register"].active),
+  .auth-container:has(.auth-tab[data-tab="sso"].active) { max-width: 100%; }
+  .auth-2col { grid-template-columns: 1fr; }
+}
+
+/* ── Account avatar in the server rail (v4.7.4) ───────────────────────── */
+.rail-account { margin-top: auto; position: relative; display: flex; justify-content: center; padding: 8px 0 2px; }
+.rail-avatar-btn { position: relative; width: 42px; height: 42px; padding: 0; border: none; background: none; cursor: pointer; }
+.rail-avatar {
+  display: flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; border-radius: 50%; overflow: hidden;
+  background: var(--accent); color: var(--accent-text, #06121a);
+  font-weight: 700; font-size: 1.05rem; line-height: 1;
+  transition: border-radius var(--transition);
+}
+.rail-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rail-avatar-btn:hover .rail-avatar, .rail-avatar-btn.open .rail-avatar { border-radius: 32%; }
+.rail-status-dot {
+  position: absolute; right: -1px; bottom: -1px; width: 13px; height: 13px;
+  border-radius: 50%; background: var(--success); border: 2.5px solid var(--bg-tertiary);
+}
+.rail-status-dot.away { background: var(--warning); }
+.rail-status-dot.dnd { background: var(--danger); }
+.rail-status-dot.invisible, .rail-status-dot.offline { background: var(--text-muted); }
+
+.rail-menu {
+  position: fixed; z-index: 4000; min-width: 210px;
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 14px 36px -10px rgba(0,0,0,.65); padding: 6px;
+}
+.rail-menu-header { padding: 8px 10px 10px; border-bottom: 1px solid var(--border); margin-bottom: 6px; display: flex; flex-direction: column; gap: 1px; }
+.rail-menu-name { font-weight: 700; color: var(--text-primary); font-size: .95rem; }
+.rail-menu-username { color: var(--text-muted); font-size: .8rem; }
+.rail-menu-item { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text-secondary); padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: .88rem; }
+.rail-menu-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.rail-menu-danger { color: var(--danger); }
+.rail-menu-danger:hover { background: color-mix(in srgb, var(--danger) 15%, transparent); color: var(--danger); }
+.rail-menu-sep { height: 1px; background: var(--border); margin: 6px 4px; }
+
+/* Desktop only (>1024px, where the server rail is visible): the account lives in
+   the rail, so retire the old top user-bar + the standalone Settings button. On
+   tablet/mobile (<=1024px) the rail is hidden, so the top user-bar returns as the
+   account access point. */
+@media (min-width: 1025px) {
+  .sidebar-header .user-bar { display: none; }
+  .btn-settings-popout { display: none !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.5 — RANK REWARDS: profile banners (solid → gradient → animated) +
+   name effects, unlocked by level. Earned cosmetics, so gradients/animation
+   are intentional here (opt-in rewards), unlike the flat default UI.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Banner presets — used on .profile-popup-banner and on picker swatches. */
+.ma-banner-solid-slate   { background: #2a3140; }
+.ma-banner-solid-cyan    { background: #0e7490; }
+.ma-banner-solid-crimson { background: #b3253a; }
+.ma-banner-solid-violet  { background: #6d28d9; }
+.ma-banner-grad-aurora   { background: linear-gradient(135deg, #22d3ee, #a855f7); }
+.ma-banner-grad-sunset   { background: linear-gradient(135deg, #ff8a00, #e52e71); }
+.ma-banner-grad-ocean    { background: linear-gradient(135deg, #2193b0, #6dd5ed); }
+.ma-banner-grad-ember    { background: linear-gradient(135deg, #f83600, #f9d423); }
+/* Animated ("GIF-like" moving) banners. */
+.ma-banner-anim-holo  { background: linear-gradient(90deg, #22d3ee, #a855f7, #ec4899, #22d3ee); background-size: 300% 100%; animation: ma-banner-shift 6s linear infinite; }
+.ma-banner-anim-flow  { background: linear-gradient(120deg, #4f46e5, #a855f7, #4f46e5); background-size: 220% 100%; animation: ma-banner-shift 5s ease-in-out infinite; }
+.ma-banner-anim-pulse { background: linear-gradient(135deg, #0e7490, #22d3ee); animation: ma-banner-pulse 2.6s ease-in-out infinite; }
+@keyframes ma-banner-shift { 0% { background-position: 0% 50%; } 100% { background-position: 300% 50%; } }
+@keyframes ma-banner-pulse { 0%,100% { filter: brightness(0.85); } 50% { filter: brightness(1.25); } }
+
+/* Name effects. */
+.ma-fx-name-gradient {
+  background: linear-gradient(90deg, #22d3ee, #a855f7);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.ma-fx-name-glow { color: var(--accent) !important; animation: ma-name-glow 2.2s ease-in-out infinite; }
+@keyframes ma-name-glow {
+  0%,100% { text-shadow: 0 0 5px color-mix(in srgb, var(--accent) 55%, transparent); }
+  50%     { text-shadow: 0 0 14px color-mix(in srgb, var(--accent) 90%, transparent); }
+}
+
+/* Rank Rewards picker modal. */
+.rank-rewards-box { max-width: 470px; width: 100%; }
+.rr-section-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 8px; }
+.rr-swatch-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.rr-swatch { position: relative; border: 1px solid var(--border); border-radius: 10px; background: none; padding: 0; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; }
+.rr-swatch:hover:not(.locked) { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.rr-swatch.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.rr-swatch.locked { opacity: .5; cursor: not-allowed; }
+.rr-swatch-fill { height: 34px; display: block; background: var(--bg-tertiary); }
+.rr-swatch-label { font-size: .7rem; padding: 4px 2px; color: var(--text-secondary); text-align: center; }
+.rr-lock { position: absolute; top: 4px; right: 4px; font-size: .6rem; background: rgba(0,0,0,.62); color: #fff; padding: 1px 5px; border-radius: 6px; }
+.rr-fx-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.rr-fx { border: 1px solid var(--border); border-radius: 10px; background: var(--bg-tertiary); padding: 10px 6px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.rr-fx:hover:not(.locked) { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.rr-fx.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.rr-fx.locked { opacity: .5; cursor: not-allowed; }
+.rr-fx-demo { font-weight: 700; font-size: .95rem; }
+.rr-fx-label { font-size: .66rem; color: var(--text-muted); text-align: center; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.6 — Channels / Direct Messages as tabs (one pane at a time), a
+   missed-messages banner above them, and avatars + presence in the DM list.
+   ══════════════════════════════════════════════════════════════════════ */
+.sidebar-tabs { display: flex; gap: 6px; padding: 8px 12px 4px; }
+.sidebar-tab {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 8px; border: 1px solid transparent; border-radius: 9px;
+  background: var(--bg-tertiary); color: var(--text-secondary);
+  font-size: .8rem; font-weight: 600; cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.sidebar-tab:hover { color: var(--text-primary); }
+.sidebar-tab.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.sidebar-tab-badge { min-width: 16px; height: 16px; padding: 0 5px; border-radius: 8px; background: var(--danger); color: #fff; font-size: .66rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+
+/* One pane at a time; hide the resize handle in tab mode + let the pane fill. */
+.sidebar-split[data-pane="channels"] #dm-pane,
+.sidebar-split[data-pane="dms"] #channels-pane { display: none !important; }
+.sidebar-split[data-pane] .sidebar-split-handle { display: none !important; }
+.sidebar-split[data-pane] #channels-pane,
+.sidebar-split[data-pane] #dm-pane { flex: 1 1 auto !important; height: auto !important; max-height: none !important; min-height: 0 !important; }
+/* The in-pane header label duplicates the tab — hide the label + arrow, keep the
+   action buttons (organize / sub-channels) as a thin right-aligned toolbar. */
+.sidebar-split[data-pane] #channels-toggle .channels-toggle-arrow,
+.sidebar-split[data-pane] #dm-toggle-header .dm-toggle-arrow,
+.sidebar-split[data-pane] #channels-toggle .section-label-text,
+.sidebar-split[data-pane] #dm-toggle-header .section-label-text { display: none; }
+.sidebar-split[data-pane] #channels-toggle,
+.sidebar-split[data-pane] #dm-toggle-header { min-height: 0; padding: 2px 8px; justify-content: flex-end; }
+
+/* Missed-messages banner above the tabs. */
+.dm-missed-banner {
+  margin: 8px 12px 0; padding: 8px 12px; border-radius: 9px; cursor: pointer;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger); font-size: .8rem; font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.dm-missed-banner:hover { background: color-mix(in srgb, var(--danger) 22%, transparent); }
+
+/* DM row: partner avatar + presence dot instead of a bare "@". */
+.dm-item-avatar-wrap { position: relative; flex: 0 0 auto; width: 22px; height: 22px; margin-right: 8px; display: inline-flex; }
+.dm-item-avatar { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 700; color: #fff; }
+.dm-item-avatar.avatar-hexagon { border-radius: 0; clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); }
+.dm-item-avatar.avatar-squircle { border-radius: 30%; }
+.dm-item-status { position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--bg-secondary); background: var(--text-muted); }
+.dm-item-status.online { background: var(--success); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.7 — Tablet responsive fix. Below the desktop breakpoint (<=1024px)
+   BOTH side panels are off-canvas overlays (toggled by the header buttons) so
+   the main chat area always gets the full width — no more squished layout on
+   tablets. Loads last, so it wins over any base in-flow right-sidebar rule.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .right-sidebar { position: fixed !important; }
+  .main { flex: 1 1 auto !important; width: auto !important; min-width: 0 !important; }
+  /* Rail stays collapsed (servers live in the sidebar overlay's bubble row). */
+  .server-bar { width: 0 !important; min-width: 0 !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.7 — First-run onboarding tour (Discord-style coach marks). A dimmed
+   backdrop with a spotlight over each highlighted control + a popover that
+   explains it; Next advances, "Skip all" ends. Shown once for new users.
+   ══════════════════════════════════════════════════════════════════════ */
+.tour-overlay { position: fixed; inset: 0; z-index: 100050; pointer-events: none; }
+.tour-spotlight {
+  position: fixed; border-radius: 12px; pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(3, 6, 12, .74), 0 0 0 2px var(--accent);
+  transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease;
+}
+.tour-pop {
+  position: fixed; z-index: 100051; width: 300px; max-width: 88vw;
+  background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 16px 40px -12px rgba(0,0,0,.6); padding: 16px; pointer-events: auto;
+}
+.tour-pop h4 { margin: 0 0 6px; font-size: 1rem; color: var(--text-primary); font-family: var(--font-heading, inherit); }
+.tour-pop p { margin: 0 0 14px; font-size: .86rem; color: var(--text-secondary); line-height: 1.5; }
+.tour-pop-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tour-step-count { font-size: .75rem; color: var(--text-muted); }
+.tour-actions { display: flex; gap: 8px; align-items: center; }
+.tour-skip { background: none; border: none; color: var(--text-muted); font-size: .8rem; cursor: pointer; padding: 6px 4px; }
+.tour-skip:hover { color: var(--text-secondary); }
+.tour-next { background: var(--accent); color: var(--accent-text, #06121a); border: none; border-radius: 8px; padding: 7px 16px; font-weight: 700; font-size: .84rem; cursor: pointer; }
+.tour-next:hover { filter: brightness(1.07); }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.8 — header/brand de-clutter (per feedback). Remove the sidebar wordmark,
+   the duplicate channel-header "Join Voice" (the right voice panel keeps its
+   own), and the raw channel-code cluster; the remaining tools are clean SVGs.
+   ══════════════════════════════════════════════════════════════════════ */
+.channel-header #voice-join-btn { display: none !important; }
+#channel-code-display,
+#copy-code-btn,
+#channel-code-settings-btn,
+.header-actions-box .header-actions-divider { display: none !important; }
+
+/* v4.7.8 — mobile/tablet: force the off-canvas panels above the backdrop + the
+   composer. A desktop layering rule was winning and dropping them to z-index 1,
+   so they opened BEHIND the message panel. */
+@media (max-width: 1024px) {
+  #app-body .sidebar,
+  #app-body .right-sidebar { z-index: 100000 !important; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.10 — restore the sidebar brand with a proper SVG mark; fix the DM
+   popout send button (it had no set size, so it rendered tiny/squished).
+   ══════════════════════════════════════════════════════════════════════ */
+.sidebar-header .brand .logo-sm { display: inline-flex; align-items: center; line-height: 0; }
+.sidebar-header .brand .logo-sm svg { color: var(--accent); display: block; }
+
+/* DM popout / thread send button: a proper square button that matches the input
+   height, instead of a small padding-only box. */
+.dm-pip-send {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0 !important;
+  align-self: flex-end;
+  border-radius: 9px;
+}
+.dm-pip-send svg { width: 18px; height: 18px; }
+
+/* ══════════════════════════════════════════════════════════════════════
+   v4.7.11 — Admin user dossier (IPs, country, VPN/proxy, client, IP ban).
+   Admin-only surface; never shown to moderators.
+   ══════════════════════════════════════════════════════════════════════ */
+.aud-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-bottom: 14px; }
+.aud-cell { display: flex; flex-direction: column; gap: 2px; }
+.aud-k { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.aud-v { font-size: .9rem; color: var(--text-primary); }
+.aud-section-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin: 10px 0 4px; }
+.aud-ips { display: flex; flex-direction: column; gap: 8px; }
+.aud-ip-row { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.aud-ip-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aud-ip-addr { font-family: ui-monospace, monospace; font-size: .9rem; color: var(--text-primary); }
+.aud-ip-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.aud-badge { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: .7rem; font-weight: 600; background: var(--bg-tertiary); color: var(--text-secondary); border: 1px solid var(--border); }
+.aud-badge-danger { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.aud-badge-warn { background: color-mix(in srgb, var(--warning, #f0b400) 18%, transparent); color: var(--warning, #f0b400); border-color: color-mix(in srgb, var(--warning, #f0b400) 42%, transparent); }
+.aud-badge-ok { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); border-color: color-mix(in srgb, var(--success) 38%, transparent); }
+
+/* ── Server directory (Discover servers) ──────────────────────────────── */
+.sd-item { display: flex; align-items: center; gap: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+.sd-item-info { flex: 1; min-width: 0; }
+.sd-item-name { font-weight: 700; color: var(--text-primary); font-size: .92rem; }
+.sd-item-desc { font-size: .8rem; color: var(--text-secondary); margin-top: 2px; }
+.sd-item-url { font-size: .72rem; color: var(--text-muted); font-family: ui-monospace, monospace; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sd-item .sd-open { flex: 0 0 auto; }
+
+/* ── Image lightbox zoom controls (#5) ────────────────────────────────── */
+.lightbox-zoom {
+  position: absolute;
+  bottom: 18px; left: 50%; transform: translateX(-50%);
+  z-index: 10001;
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 6px;
+  background: color-mix(in srgb, #05070c 78%, transparent);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+.lightbox-zoom-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 34px; height: 34px; padding: 0 10px;
+  border: none; border-radius: 999px; cursor: pointer;
+  background: transparent; color: #e9eef8;
+  font-size: .82rem; font-weight: 600; line-height: 1;
+  transition: background .12s ease;
+}
+.lightbox-zoom-btn:hover { background: rgba(255,255,255,.12); }
+.lightbox-zoom-btn:disabled { opacity: .38; cursor: default; }
+.lightbox-zoom-btn svg { display: block; }
+.lightbox-zoom-reset { font-size: .74rem; letter-spacing: .02em; }
+.lightbox-zoom-level {
+  min-width: 46px; text-align: center;
+  color: #cfe9f4; font-size: .78rem; font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+/* ── Sticky sender avatar for long message runs (#11) ─────────────────── */
+.sticky-avatar {
+  position: fixed;
+  z-index: 6;                 /* above message content, below modals/lightbox */
+  pointer-events: none;
+  border-radius: 50%;
+  animation: sticky-av-in .12s ease-out;
+}
+.sticky-avatar > .message-avatar,
+.sticky-avatar > .message-avatar-img,
+.sticky-avatar > img {
+  width: 100% !important; height: 100% !important;
+  margin: 0 !important;
+  box-shadow: 0 3px 10px rgba(0,0,0,.5);
+  outline: 2px solid var(--bg-primary);
+}
+@keyframes sticky-av-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sticky-avatar { animation: none; } }
+
+/* ── Hide/unhide affordances (#6) ─────────────────────────────────────── */
+/* The ⋯ "more" button (which hosts Hide channel / Hide DM) was hover-only
+   (opacity:0), so on touch devices — no hover — it was invisible and the hide
+   action was unreachable. Keep it discoverable everywhere. */
+.channel-more-btn { opacity: .5; pointer-events: auto; }
+.channel-item:hover .channel-more-btn,
+.channel-item.active .channel-more-btn,
+.channel-more-btn:focus { opacity: 1; }
+@media (hover: none), (pointer: coarse) { .channel-more-btn { opacity: .9; } }
+
+/* The "N hidden channels" restore bar is the visible toggle to bring them back —
+   style it as a clear button rather than a faint ghost row. */
+.hidden-channels-bar {
+  display: flex; align-items: center; gap: 7px;
+  cursor: pointer; padding: 6px 12px; margin: 4px 6px 2px;
+  font-size: .8rem; font-weight: 600;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border));
+  border-radius: 8px;
+}
+.hidden-channels-bar:hover { color: var(--text-primary); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.hidden-channels-bar .hidden-bar-ico { flex: 0 0 auto; color: var(--accent); }
+
+/* ── DM header dropdown stacking (#10) ────────────────────────────────── */
+/* The chat header had z-index:1, tying with the DM safety notice (also z-index:1)
+   inside the message area; being later in the DOM, the notice won and buried the
+   lock-icon (encryption) dropdown that drops down from the header. Lift the whole
+   header context above the message content so ALL its dropdowns sit on top —
+   still far below modals (100001) and the DM pip (99999). */
+.channel-header, [data-haven-region="channel-header"] { z-index: 30; }
+.e2e-dropdown { z-index: 60; }
+
+/* ── Gaming-style notifications / toasts (#12) ────────────────────────── */
+/* Dark glass panel with a type-coloured left stripe, a matching glyph and a
+   soft coloured edge-glow — replaces the flat coloured bars. */
+.toast {
+  --toast-accent: var(--accent);
+  --toast-ico: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2322d3ee' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='9'/><line x1='12' y1='11' x2='12' y2='16'/><circle cx='12' cy='7.6' r='1' fill='%2322d3ee' stroke='none'/></svg>");
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 16px 11px 13px;
+  min-width: 230px; max-width: 380px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--toast-accent);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: .84rem; font-weight: 500; line-height: 1.4;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 90%, var(--toast-accent) 10%), var(--bg-secondary));
+  box-shadow:
+    0 12px 34px -12px rgba(0,0,0,.7),
+    0 0 22px -8px color-mix(in srgb, var(--toast-accent) 75%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.04);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  animation: ma-toast-in .28s cubic-bezier(.2,.9,.3,1.15), toastOut .3s ease 3.5s forwards;
+}
+.toast::before {
+  content: ''; flex: 0 0 auto; width: 19px; height: 19px;
+  background: center/19px 19px no-repeat var(--toast-ico);
+}
+.toast.success {
+  --toast-accent: #34d399;
+  --toast-ico: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2334d399' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'><path d='M20 6 9 17l-5-5'/></svg>");
+  color: #d7ffe8;
+}
+.toast.error {
+  --toast-accent: #ff6b6b;
+  --toast-ico: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff6b6b' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3.2 22.5 20.5H1.5Z'/><line x1='12' y1='10' x2='12' y2='14'/><circle cx='12' cy='17' r='1' fill='%23ff6b6b' stroke='none'/></svg>");
+  color: #ffe0e0;
+}
+.toast.warning {
+  --toast-accent: #f5b301;
+  --toast-ico: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f5b301' stroke-width='2.3' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3.2 22.5 20.5H1.5Z'/><line x1='12' y1='10' x2='12' y2='14'/><circle cx='12' cy='17' r='1' fill='%23f5b301' stroke='none'/></svg>");
+  color: #ffeec2;
+}
+.toast.info { --toast-accent: var(--accent); color: #e6f6ff; }
+@keyframes ma-toast-in {
+  from { opacity: 0; transform: translateY(-16px) scale(.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
+/* ── Icon / input centering (#15) ─────────────────────────────────────── */
+/* Inline SVGs default to baseline alignment, so glyphs sat slightly high and
+   off to the side inside round buttons. Center every icon in its control and
+   drop SVGs onto the middle line. */
+svg { vertical-align: middle; }
+.icon-btn, .btn-icon, .sidebar-bottom-btn, .voice-header-btn, .rail-btn,
+.channel-more-btn, .msg-dots-btn, .dm-pip-send, .lightbox-nav, .modal-close-btn,
+.header-actions-box .icon-btn, .e2e-menu-wrapper .icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.icon-btn > svg, .btn-icon > svg, .sidebar-bottom-btn > svg, .rail-btn > svg,
+.channel-more-btn > svg, .dm-pip-send > svg, .lightbox-nav > svg { display: block; }
+/* Single-line text inputs: normalise the line box so the caret/text sit centred
+   rather than riding high from an inherited tall line-height. */
+input:where([type="text"],[type="password"],[type="search"],[type="email"],[type="url"],[type="number"],[type="tel"]) {
+  line-height: normal;
+}
+input, textarea, select { vertical-align: middle; }
+
+/* ── Registration: horizontal two-panel split (#1) ────────────────────── */
+/* Account details on the left, the finish step on the right, divided by a line
+   — "wide, not long". Widen the register card to fit both panels. */
+.auth-container:has(.auth-tab[data-tab="register"].active) { max-width: 41rem; }
+/* Grid lives on an inner wrapper (not the form) because auth.js toggles the
+   form's inline display:flex/none to show/hide it, which would override a grid
+   set on the form itself. */
+#register-form { align-items: stretch; }
+.auth-split-grid {
+  display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; gap: 0; width: 100%;
+}
+.auth-split-grid .auth-split-panel { padding: 0 1.15rem; min-width: 0; }
+.auth-split-grid .auth-split-panel:first-child { padding-left: 0; }
+.auth-split-grid .auth-split-panel-side {
+  border-left: 1px solid var(--border-light);
+  padding-right: 0;
+  display: flex; flex-direction: column;
+}
+.auth-split-label {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .13em;
+  color: var(--text-muted); font-weight: 700; margin: 0 0 .7rem;
+}
+.auth-split-hint { font-size: .75rem; color: var(--text-muted); margin: .1rem 0 .9rem; line-height: 1.45; }
+.auth-split-panel-side .btn-primary { width: 100%; margin-top: auto; }
+@media (max-width: 600px) {
+  .auth-split-grid { grid-template-columns: 1fr; }
+  .auth-split-grid .auth-split-panel { padding: 0; }
+  .auth-split-grid .auth-split-panel-side {
+    border-left: none; border-top: 1px solid var(--border-light);
+    padding-top: 1rem; margin-top: .5rem;
+  }
+  .auth-container:has(.auth-tab[data-tab="register"].active) { max-width: 26rem; }
+}
+
+/* Age / Terms as a distinct callout, with the 18+ line in its own sub-area (#1). */
+.eula-notice {
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-secondary));
+  padding: 11px 13px; margin: 14px 0 6px;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.eula-check-row {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: .8rem; line-height: 1.45; color: var(--text-secondary); cursor: pointer;
+}
+.eula-check-row input[type="checkbox"] { margin: 2px 0 0; flex: 0 0 auto; }
+.eula-notice .eula-check-row:first-child {
+  padding-bottom: 9px; border-bottom: 1px solid var(--border);
+  color: var(--text-primary); font-weight: 500;
+}
+
+/* ── Modal overflow / reachable buttons (#3) ──────────────────────────── */
+/* A modal taller than the viewport was centred by the flex overlay with its top
+   pulled above the scroll origin, so the top (and sometimes the buttons) were
+   unreachable and no scrollbar showed. `margin:auto` on the modal + a scrollable
+   overlay is the canonical fix: short modals still centre, tall ones scroll
+   inside the overlay. The modal's own max-height/overflow still scrolls its body
+   first; this is the safety net for content that exceeds it. */
+.modal-overlay { overflow-y: auto; padding: 20px 12px; }
+.modal-overlay > .modal { margin: auto; }
+/* Give the register/auth-heavy flows breathing room on short screens too. */
+@media (max-height: 640px) {
+  .modal { max-height: none; }
+}
+
+/* ── LFG "new post" badge (#7) ────────────────────────────────────────── */
+.lfg-badge {
+  position: absolute; top: -3px; right: -3px;
+  min-width: 17px; height: 17px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: var(--danger, #ff5c5c); color: #fff;
+  font-size: .64rem; font-weight: 800; line-height: 1;
+  border: 2px solid var(--bg-secondary);
+  box-shadow: 0 0 10px -2px var(--danger, #ff5c5c);
+  pointer-events: none;
+}
+
+/* ── Admin IP-intel note (#20) ────────────────────────────────────────── */
+.aud-intel-note {
+  display: block; margin-top: 4px;
+  font-size: .72rem; color: var(--text-muted); line-height: 1.4;
+}
+
+/* ── DM Nudge screen shake (#6) ───────────────────────────────────────── */
+.ma-nudge-shake { animation: ma-nudge-shake .6s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes ma-nudge-shake {
+  10%, 90% { transform: translate3d(-2px, 0, 0); }
+  20%, 80% { transform: translate3d(4px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+  40%, 60% { transform: translate3d(8px, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .ma-nudge-shake { animation: none; } }
+
+/* ── DM read receipts (#5) — WhatsApp/Telegram-style ticks ────────────── */
+.dm-receipt {
+  display: block; text-align: right; line-height: 0; margin-top: 1px;
+  color: var(--text-muted); opacity: .8;
+}
+.dm-receipt .tick-2 { display: none; }            /* sent = single tick */
+.dm-receipt.read { color: var(--accent); opacity: 1; }
+.dm-receipt.read .tick-2 { display: inline; }     /* read = double tick, accent */
+/* In DMs the avatar gutter is hidden, so the tick aligns under the bubble. */
+.dm-pip-messages .dm-receipt { margin-right: 2px; }

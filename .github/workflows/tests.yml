@@ -1,0 +1,28 @@
+# CI: run the test suite and locale validation on every push and PR.
+#
+# The repo shipped 13 node:test files but nothing ran them — no `test`
+# npm script and no workflow. This adds both halves of the safety net so a
+# regression in auth, voice signalling, ferry, webhooks, i18n or the theme
+# contract is caught automatically.
+name: tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # Match the server's runtime guard (server.js requires Node 22-26).
+          node-version: '22'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: Validate locales
+        run: npm run validate-locales

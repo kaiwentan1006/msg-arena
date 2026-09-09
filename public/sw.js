@@ -1,0 +1,74 @@
+// ═══════════════════════════════════════════════════════════
+// MSG Arena — Service Worker for Push Notifications
+// Handles incoming push events and notification click actions
+// ═══════════════════════════════════════════════════════════
+
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = { title: 'MSG Arena', body: event.data.text() };
+  }
+
+  const title = payload.title || 'MSG Arena';
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/icon-192.svg',
+    badge: '/icon-192.svg',
+    tag: payload.tag || 'haven-message',       // collapse similar notifications
+    renotify: true,                            // alert even if same tag
+    data: {
+      channelCode: payload.channelCode || null,
+      url: payload.url || '/'
+    }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// Click notification → focus MSG Arena tab or open it
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = event.notification.data?.url || '/app';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // If MSG Arena is already open, focus it and navigate
+      for (const client of windowClients) {
+        if (client.url.includes('/app')) {
+          client.focus();
+          // Post the channel code so the app can switch channels
+          if (event.notification.data?.channelCode) {
+            client.postMessage({
+              type: 'push-notification-click',
+              channelCode: event.notification.data.channelCode
+            });
+          }
+          return;
+        }
+      }
+      // Otherwise open a new window
+      return clients.openWindow(targetUrl);
+    })
+  );
+});
+
+// Activate immediately — don't wait for old SW to die
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
+// A fetch handler makes the app installable across browsers. Deliberately a
+// network passthrough — the client is realtime and its assets are cache-busted
+// via ?v=, so we never want a service worker serving a stale app shell.
+self.addEventListener('fetch', (event) => {
+  // Let the network handle everything; only intercept to satisfy the PWA
+  // install criteria. No caching, no offline shell (by design for a live app).
+  return;
+});
